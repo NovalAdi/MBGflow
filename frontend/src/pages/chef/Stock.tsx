@@ -1,0 +1,258 @@
+import * as React from "react";
+import { Card } from "@/src/components/ui/Card";
+import { Badge } from "@/src/components/ui/Badge";
+import { Button } from "@/src/components/ui/Button";
+import { Modal } from "@/src/components/ui/Modal";
+import { Box, Trash2, AlertCircle, Calendar, Hash, ArrowUpDown, ChevronDown, Package, Warehouse } from "lucide-react";
+import { cn } from "@/src/lib/utils";
+import { isBefore, addDays, format, parseISO } from "date-fns";
+import { motion, AnimatePresence } from "motion/react";
+import { api } from "@/src/services/api";
+
+export const ChefStock = ({ user }: { user: any }) => {
+  const [stockItems, setStockItems] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [isWastageModalOpen, setWastageModalOpen] = React.useState(false);
+  const [selectedBatch, setSelectedBatch] = React.useState<any>(null);
+  const [wastageWeight, setWastageWeight] = React.useState("");
+  const [wastageReason, setWastageReason] = React.useState("Busuk");
+  const [wastageNotes, setWastageNotes] = React.useState("");
+
+  const refreshStock = React.useCallback(() => {
+    if (user?.kitchenId) {
+      setLoading(true);
+      api.getKitchenDetail(user.kitchenId).then(res => {
+        setStockItems(res.stock || []);
+        setLoading(false);
+      });
+    }
+  }, [user?.kitchenId]);
+
+  React.useEffect(() => {
+    refreshStock();
+  }, [refreshStock]);
+
+  // Grouping by material (which is already provided as an item in stock)
+  // Our new structure has items, and each item has batches
+  const groupedStock = React.useMemo(() => {
+    return stockItems.map(item => ({
+      ...item,
+      batches: (item.batches || []).sort((a: any, b: any) => parseISO(a.expiry).getTime() - parseISO(b.expiry).getTime())
+    }));
+  }, [stockItems]);
+
+  const handleReportWastage = (batch: any) => {
+    setSelectedBatch(batch);
+    setWastageWeight("");
+    setWastageReason("Busuk");
+    setWastageNotes("");
+    setWastageModalOpen(true);
+  };
+
+  const handleWastageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBatch || !user?.kitchenId) return;
+
+    try {
+      await api.reportWastage({
+        batchId: selectedBatch.id,
+        kitchenId: user.kitchenId,
+        materialName: selectedBatch.material,
+        container: selectedBatch.container,
+        weight: parseFloat(wastageWeight),
+        reason: wastageReason,
+        notes: wastageNotes
+      });
+      setWastageModalOpen(false);
+      refreshStock();
+    } catch (err: any) {
+      alert(err?.message || "Gagal melaporkan wastage.");
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Stok Dapur Granular</h2>
+          <p className="text-slate-600 font-bold text-[11px] uppercase tracking-widest mt-2 px-1">Monitor persediaan per wadah (FEFO)</p>
+        </div>
+        <div className="flex items-center gap-3">
+           <Button variant="secondary" size="sm" className="h-9 text-[10px]" onClick={refreshStock}>Perbarui Stok</Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {groupedStock.map((material) => (
+          <StockRow 
+             key={material.name} 
+             material={material} 
+             onReportWastage={handleReportWastage}
+          />
+        ))}
+      </div>
+
+      {/* Wastage Report Modal */}
+      <Modal 
+        isOpen={isWastageModalOpen} 
+        onClose={() => setWastageModalOpen(false)} 
+        title="Laporan Kerugian (Wastage)"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-4">
+            <div className="p-3 bg-red-100 rounded-xl text-red-600 shrink-0">
+               <AlertCircle className="w-6 h-6" />
+            </div>
+             <div>
+                <h4 className="font-bold text-red-800">{selectedBatch?.material}</h4>
+                <p className="text-xs text-red-700 font-medium">
+                  ID Batch: {selectedBatch?.id} • {selectedBatch?.package_capacity ? `${selectedBatch.container} (${selectedBatch.package_capacity} ${selectedBatch.package_unit})` : selectedBatch?.container}
+                </p>
+             </div>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleWastageSubmit}>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">
+                  Jumlah Dibuang ({selectedBatch?.weight ? selectedBatch.weight.replace(/[0-9.\s]+/g, '') : ''})
+                </label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  required
+                  value={wastageWeight}
+                  onChange={(e) => setWastageWeight(e.target.value)}
+                  className="w-full border-2 border-slate-100 rounded-xl p-4 font-bold" 
+                  placeholder="0.0" 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Alasan</label>
+                <select 
+                  value={wastageReason}
+                  onChange={(e) => setWastageReason(e.target.value)}
+                  className="w-full border-2 border-slate-100 rounded-xl p-4 font-medium text-sm"
+                >
+                  <option value="Busuk">Busuk</option>
+                  <option value="Kedaluwarsa">Kedaluwarsa</option>
+                  <option value="Tumpah / Rusak">Tumpah / Rusak</option>
+                  <option value="Kelalaian Manusia">Kelalaian Manusia</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase">Catatan Tambahan</label>
+              <textarea 
+                value={wastageNotes}
+                onChange={(e) => setWastageNotes(e.target.value)}
+                className="w-full border-2 border-slate-100 rounded-xl p-4 h-24 resize-none" 
+                placeholder="Ceritakan detail kronologi..." 
+              />
+            </div>
+            <Button className="w-full py-6 mt-4 text-lg" variant="danger" type="submit">
+              Submit Laporan Kerugian
+            </Button>
+          </form>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+const StockRow = ({ material, onReportWastage }: { material: any, onReportWastage: (batch: any) => void, key?: any }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  
+  return (
+    <Card className="p-0 overflow-hidden transform-gpu border-slate-50 rounded-[24px] shadow-sm hover:shadow-lg hover:shadow-primary/5 transition-all">
+      <div 
+        className={cn(
+          "p-4 flex items-center gap-4 cursor-pointer hover:bg-slate-50 transition-colors",
+          isOpen && "bg-slate-50"
+        )}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="w-10 h-10 rounded-xl bg-primary-light flex items-center justify-center text-primary shrink-0 shadow-sm">
+          <Package className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h4 className="font-black text-slate-800 text-lg tracking-tighter leading-tight">{material.name}</h4>
+          <div className="flex items-center gap-2 mt-1 px-0.5">
+            <span className="text-[9px] font-bold text-slate-555 uppercase tracking-widest">{material.batches.length} Wadah Aktif</span>
+            <span className="w-1 h-1 rounded-full bg-slate-350" />
+            <span className="text-[9px] font-bold text-primary uppercase tracking-widest">{material.totalWeight} Total</span>
+          </div>
+        </div>
+        <div className={cn(
+          "w-8 h-8 rounded-full border border-slate-100 flex items-center justify-center transition-all",
+          isOpen ? "bg-primary text-white border-primary" : "text-slate-300"
+        )}>
+           <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
+        </div>
+      </div>
+      
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+            className="overflow-hidden bg-slate-50/50"
+          >
+            <div className="p-4 pt-0 space-y-2">
+              {material.batches.map((batch: any) => {
+                const expiryDate = parseISO(batch.expiry);
+                const isNearExpiry = isBefore(expiryDate, addDays(new Date(), 30));
+
+                return (
+                  <div key={batch.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-3.5 bg-white border border-slate-50 rounded-xl shadow-sm hover:border-primary/20 transition-all group/item">
+                    <div className="flex items-center gap-4">
+                      <div className="p-2.5 bg-slate-50 rounded-xl group-hover/item:bg-primary-light transition-colors">
+                        <Box className="w-5 h-5 text-slate-400 group-hover/item:text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-800 tracking-tight text-base leading-none">
+                          {batch.package_capacity ? `${batch.container} (${batch.package_capacity} ${batch.package_unit})` : batch.container}
+                        </p>
+                        <p className="text-[9px] text-slate-550 font-bold uppercase tracking-[0.2em] flex items-center gap-1 mt-1.5">
+                          <Hash className="w-2.5 h-2.5 text-slate-450" />
+                          {batch.id}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-6 md:gap-8">
+                       <div className="flex flex-col text-right md:text-left">
+                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">BERAT</span>
+                         <span className="font-black text-slate-800 text-sm tracking-tighter">{batch.weight}</span>
+                       </div>
+                       
+                       <div className="flex flex-col text-right md:text-left">
+                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">EXPIRED</span>
+                         <div className="flex items-center gap-2">
+                            <span className={cn("font-black text-sm tracking-tighter", isNearExpiry ? "text-red-500" : "text-slate-800")}>
+                               {format(expiryDate, 'dd/MM/yyyy')}
+                            </span>
+                         </div>
+                       </div>
+
+                       <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-9 px-3 text-red-400 hover:text-red-650 hover:bg-red-50 font-black text-[9px] uppercase tracking-widest rounded-lg"
+                        onClick={() => onReportWastage({ ...batch, material: material.name })}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                        Lapor
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}

@@ -1,0 +1,172 @@
+{
+  "kitchens": [
+    { "id": "k1", "name": "Dapur Pusat Jakarta", "address": "Grogol, Jakarta Barat", "capacity": 5000, "city": "Jakarta" },
+    { "id": "k2", "name": "Dapur Satelit Tangerang", "address": "BSD, Tangerang Selatan", "capacity": 2500, "city": "Tangerang" },
+    { "id": "k3", "name": "Production Hub Bandung", "address": "Dago, Bandung", "capacity": 3000, "city": "Bandung" }
+  ],
+  "menus": [
+    {
+      "id": "menu-1",
+      "name": "Ayam Goreng Gurih",
+      "ingredients": [
+        { "name": "Ayam Negri", "perPortion": 0.25, "unit": "kg" },
+        { "name": "Minyak Goreng", "perPortion": 0.05, "unit": "L" },
+        { "name": "Bumbu Kuning", "perPortion": 0.02, "unit": "kg" }
+      ]
+    },
+    {
+      "id": "menu-2",
+      "name": "Ayam Bakar Madu",
+      "ingredients": [
+        { "name": "Ayam Negri", "perPortion": 0.25, "unit": "kg" },
+        { "name": "Kecap Manis", "perPortion": 0.03, "unit": "L" },
+        { "name": "Minyak Goreng", "perPortion": 0.01, "unit": "L" }
+      ]
+    },
+    {
+      "id": "menu-3",
+      "name": "Ikan Gurame Goreng",
+      "ingredients": [
+        { "name": "Ikan Gurame", "perPortion": 0.4, "unit": "kg" },
+        { "name": "Minyak Goreng", "perPortion": 0.05, "unit": "L" },
+        { "name": "Bumbu Ikan", "perPortion": 0.02, "unit": "kg" }
+      ]
+    },
+    {
+      "id": "menu-4",
+      "name": "Ikan Gurame Bakar",
+      "ingredients": [
+        { "name": "Ikan Gurame", "perPortion": 0.4, "unit": "kg" },
+        { "name": "Kecap Manis", "perPortion": 0.05, "unit": "L" },
+        { "name": "Sambal Kecap", "perPortion": 0.02, "unit": "kg" }
+      ]
+    },
+    {
+      "id": "menu-5",
+      "name": "Bebek Goreng Spesial",
+      "ingredients": [
+        { "name": "Daging Bebek", "perPortion": 0.3, "unit": "kg" },
+        { "name": "Minyak Goreng", "perPortion": 0.06, "unit": "L" },
+        { "name": "Bumbu Bebek", "perPortion": 0.03, "unit": "kg" }
+      ]
+    },
+    {
+      "id": "menu-6",
+      "name": "Bebek Bakar Kecap",
+      "ingredients": [
+        { "name": "Daging Bebek", "perPortion": 0.3, "unit": "kg" },
+        { "name": "Madu & Kecap", "perPortion": 0.04, "unit": "L" },
+        { "name": "Bumbu Bakar", "perPortion": 0.02, "unit": "kg" }
+      ]
+    }
+  ],
+  "inventory": [
+    {
+      "id": "mat-1",
+      "name": "Ayam Negri",
+      "batches": [
+        { "id": "b1", "kitchenId": "k1", "container": "Cold Storage A1", "weight": "150 kg", "expiry": "2024-05-10" },
+        { "id": "b2", "kitchenId": "k1", "container": "Cold Storage A2", "weight": "200 kg", "expiry": "2024-05-12" }
+      ]
+    },
+    {
+      "id": "mat-2",
+      "name": "Minyak Goreng",
+      "batches": [
+        { "id": "b3", "kitchenId": "k1", "container": "Jerigen 20L", "weight": "100 L", "expiry": "2024-10-10" },
+        { "id": "b4", "kitchenId": "k2", "container": "Jerigen 20L", "weight": "80 L", "expiry": "2024-10-15" },
+        { "id": "b5", "kitchenId": "k3", "container": "Jerigen 20L", "weight": "120 L", "expiry": "2024-10-20" }
+      ]
+    },
+    {
+      "id": "mat-3",
+      "name": "Bumbu Kuning",
+      "batches": [
+        { "id": "b6", "kitchenId": "k1", "container": "Pantry A", "weight": "40 kg", "expiry": "2024-06-01" }
+      ]
+    },
+    {
+      "id": "mat-4",
+      "name": "Kecap Manis",
+      "batches": [
+        { "id": "b7", "kitchenId": "k1", "container": "Pantry B", "weight": "50 L", "expiry": "2024-12-01" },
+        { "id": "b8", "kitchenId": "k2", "container": "Pantry B", "weight": "40 L", "expiry": "2024-11-20" }
+      ]
+    },
+    {
+      "id": "mat-5",
+      "name": "Ikan Gurame",
+      "batches": [
+        { "id": "b9", "kitchenId": "k2", "container": "Freezer B1", "weight": "300 kg", "expiry": "2024-05-15" }
+      ]
+    },
+    {
+      "id": "mat-6",
+      "name": "Bumbu Ikan",
+      "batches": [
+        { "id": "b10", "kitchenId": "k2", "container": "Pantry C", "weight": "30 kg", "expiry": "2024-06-10" }
+      ]
+    },
+    {
+      "id": "mat-7",
+      "name": "Sambal Kecap",
+      "batches": [
+        { "id": "b11", "kitchenId": "k2", "container": "Pantry D", "weight": "20 kg", "expiry": "2024-05-30" }
+      ]
+    },
+    {
+      "id": "mat-8",
+      "name": "Daging Bebek",
+      "batches": [
+        { "id": "b12", "kitchenId": "k3", "container": "Cold Room D1", "weight": "400 kg", "expiry": "2024-05-18" }
+      ]
+    },
+    {
+      "id": "mat-9",
+      "name": "Bumbu Bebek",
+      "batches": [
+        { "id": "b13", "kitchenId": "k3", "container": "Pantry E", "weight": "50 kg", "expiry": "2024-07-01" }
+      ]
+    },
+    {
+      "id": "mat-10",
+      "name": "Madu & Kecap",
+      "batches": [
+        { "id": "b14", "kitchenId": "k3", "container": "Pantry F", "weight": "40 L", "expiry": "2024-08-15" }
+      ]
+    },
+    {
+      "id": "mat-11",
+      "name": "Bumbu Bakar",
+      "batches": [
+        { "id": "b15", "kitchenId": "k3", "container": "Pantry G", "weight": "30 kg", "expiry": "2024-06-20" }
+      ]
+    }
+  ],
+  "staff": [
+    { "id": "s1", "name": "Noval Admin", "role": "Admin", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=noval", "kitchenId": "k1", "email": "novaladiperasetya@gmail.com" },
+    { "id": "s2", "name": "Andi Jakarta", "role": "Chef", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=andi", "kitchenId": "k1", "email": "chef.jakarta@mbg.com" },
+    { "id": "s3", "name": "Budi Tangerang", "role": "Chef", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=budi", "kitchenId": "k2", "email": "chef.tangerang@mbg.com" },
+    { "id": "s4", "name": "Citra Bandung", "role": "Chef", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=citra", "kitchenId": "k3", "email": "chef.bandung@mbg.com" },
+    { "id": "s5", "name": "Admin MBG", "role": "Admin", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=admin", "kitchenId": "k1", "email": "admin@mbg.com" },
+    { "id": "s6", "name": "Chef Utomo", "role": "Chef", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=chefutama", "kitchenId": "k1", "email": "chef@mbg.com" },
+    { "id": "s_k1_1", "name": "Siti Rahma", "role": "Staff", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=siti", "kitchenId": "k1", "email": "siti.rahma@mbg.com" },
+    { "id": "s_k1_2", "name": "Rian Hidayat", "role": "Staff", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=rian", "kitchenId": "k1", "email": "rian.hidayat@mbg.com" },
+    { "id": "s_k1_3", "name": "Dedi Kurniawan", "role": "Staff", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=dedi", "kitchenId": "k1", "email": "dedi.kurniawan@mbg.com" },
+    { "id": "s_k2_1", "name": "Agus Pratama", "role": "Staff", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=agus", "kitchenId": "k2", "email": "agus.pratama@mbg.com" },
+    { "id": "s_k2_2", "name": "Siska Wijaya", "role": "Staff", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=siska", "kitchenId": "k2", "email": "siska.wijaya@mbg.com" },
+    { "id": "s_k2_3", "name": "Lina Marlina", "role": "Staff", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=lina", "kitchenId": "k2", "email": "lina.marlina@mbg.com" },
+    { "id": "s_k3_1", "name": "Eko Prasetyo", "role": "Staff", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=eko", "kitchenId": "k3", "email": "eko.prasetyo@mbg.com" },
+    { "id": "s_k3_2", "name": "Yudi Hermawan", "role": "Staff", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=yudi", "kitchenId": "k3", "email": "yudi.hermawan@mbg.com" },
+    { "id": "s_k3_3", "name": "Dewi Lestari", "role": "Staff", "status": "Active", "avatar": "https://i.pravatar.cc/150?u=dewi", "kitchenId": "k3", "email": "dewi.lestari@mbg.com" }
+  ],
+  "productionPlans": [
+    { "id": "plan-1", "day": "Senin", "menuId": "menu-1", "menuName": "Ayam Goreng Gurih", "kitchenId": "k1", "kitchenName": "Dapur Pusat Jakarta", "portions": 400, "note": "Gunakan Batch b1", "status": "Ready", "chefPenanggungJawab": "Andi Jakarta" },
+    { "id": "plan-2", "day": "Selasa", "menuId": "menu-3", "menuName": "Ikan Gurame Goreng", "kitchenId": "k2", "kitchenName": "Dapur Satelit Tangerang", "portions": 200, "note": "Gunakan batch b9", "status": "Cooking", "chefPenanggungJawab": "Budi Tangerang" },
+    { "id": "plan-3", "day": "Rabu", "menuId": "menu-2", "menuName": "Ayam Bakar Madu", "kitchenId": "k1", "kitchenName": "Dapur Pusat Jakarta", "portions": 300, "note": "", "status": "Preparing", "chefPenanggungJawab": "Andi Jakarta" },
+    { "id": "plan-4", "day": "Kamis", "menuId": "menu-4", "menuName": "Ikan Gurame Bakar", "kitchenId": "k2", "kitchenName": "Dapur Satelit Tangerang", "portions": 150, "note": "", "status": "NotStarted", "chefPenanggungJawab": "Budi Tangerang" },
+    { "id": "plan-5", "day": "Jumat", "menuId": "menu-5", "menuName": "Bebek Goreng Spesial", "kitchenId": "k3", "kitchenName": "Production Hub Bandung", "portions": 350, "note": "Gunakan batch b12", "status": "NotStarted", "chefPenanggungJawab": "Citra Bandung" },
+    { "id": "plan-6", "day": "Sabtu", "menuId": "menu-6", "menuName": "Bebek Bakar Kecap", "kitchenId": "k3", "kitchenName": "Production Hub Bandung", "portions": 200, "note": "", "status": "NotStarted", "chefPenanggungJawab": "Citra Bandung" },
+    { "id": "plan-7", "day": "Minggu", "menuId": "menu-1", "menuName": "Ayam Goreng Gurih", "kitchenId": "k1", "kitchenName": "Dapur Pusat Jakarta", "portions": 500, "note": "Gunakan Batch b2", "status": "NotStarted", "chefPenanggungJawab": "Andi Jakarta" }
+  ]
+}
