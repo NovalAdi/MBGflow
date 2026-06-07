@@ -4,12 +4,20 @@ const BASE_URL = "http://localhost:5001/api";
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
+  const token = localStorage.getItem("auth_token");
+  
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((options.headers as Record<string, string>) || {}),
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
     ...options,
+    headers,
   });
 
   if (!response.ok) {
@@ -21,11 +29,16 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const api = {
-  login: async (credentials: { email: string; password?: string }): Promise<{ success: boolean; user: any }> => {
-    return request<{ success: boolean; user: any }>("/login", {
+  login: async (credentials: { email: string; password?: string }): Promise<{ success: boolean; token: string; user: any }> => {
+    const res = await request<{ success: boolean; token: string; user: any }>("/login", {
       method: "POST",
       body: JSON.stringify(credentials),
     });
+    if (res.success && res.token) {
+      localStorage.setItem("auth_token", res.token);
+      localStorage.setItem("auth_user", JSON.stringify(res.user));
+    }
+    return res;
   },
 
   getStats: async (): Promise<ReportSummary> => {
@@ -117,17 +130,28 @@ export const api = {
     );
   },
 
-  requestStock: async (material: string, amount: string, urgency: string, kitchenId?: string, kitchenName?: string): Promise<any> => {
+  requestStock: async (material: string, amount: string, urgency: string, kitchenId?: string, kitchenName?: string, supplierKitchenId?: string, supplierKitchenName?: string): Promise<any> => {
     return request<any>("/stock-requests", {
       method: "POST",
-      body: JSON.stringify({ material, amount, urgency, kitchenId, kitchenName }),
+      body: JSON.stringify({ material, amount, urgency, kitchenId, kitchenName, supplierKitchenId, supplierKitchenName }),
     });
   },
 
-  requestStockBatch: async (requests: { material: string; amount: string; urgency: string }[], kitchenId?: string, kitchenName?: string): Promise<any[]> => {
+  requestStockBatch: async (requests: { material: string; amount: string; urgency: string; supplierKitchenId?: string; supplierKitchenName?: string }[], kitchenId?: string, kitchenName?: string): Promise<any[]> => {
     return request<any[]>("/stock-requests/batch", {
       method: "POST",
       body: JSON.stringify({ requests, kitchenId, kitchenName }),
+    });
+  },
+
+  getMaterialAvailability: async (material: string): Promise<any[]> => {
+    return request<any[]>(`/inventory/material-availability?material=${encodeURIComponent(material)}`);
+  },
+
+  updateStockRequestStatus: async (id: string, status: string, adminNotes?: string): Promise<any> => {
+    return request<any>(`/stock-requests/${encodeURIComponent(id)}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status, adminNotes }),
     });
   },
 

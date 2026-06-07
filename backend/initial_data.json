@@ -1,8 +1,8 @@
 {
   "kitchens": [
-    { "id": "k1", "name": "Dapur Pusat Jakarta", "address": "Grogol, Jakarta Barat", "capacity": 5000, "city": "Jakarta" },
-    { "id": "k2", "name": "Dapur Satelit Tangerang", "address": "BSD, Tangerang Selatan", "capacity": 2500, "city": "Tangerang" },
-    { "id": "k3", "name": "Production Hub Bandung", "address": "Dago, Bandung", "capacity": 3000, "city": "Bandung" }
+    { "id": "k1", "name": "Dapur Pusat Jakarta", "address": "Grogol, Jakarta Barat", "capacity": 5000, "city": "Jakarta", "latitude": -6.1668, "longitude": 106.7865 },
+    { "id": "k2", "name": "Dapur Satelit Tangerang", "address": "BSD, Tangerang Selatan", "capacity": 2500, "city": "Tangerang", "latitude": -6.3024, "longitude": 106.6522 },
+    { "id": "k3", "name": "Production Hub Bandung", "address": "Dago, Bandung", "capacity": 3000, "city": "Bandung", "latitude": -6.8915, "longitude": 107.6106 }
   ],
   "menus": [
     {

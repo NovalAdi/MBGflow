@@ -21,6 +21,7 @@ const sidebarItems: SidebarItem[] = [
   { icon: LayoutDashboard, label: "Dashboard Chef", path: "/chef/dashboard", roles: ['Chef'] },
   { icon: ClipboardList, label: "Antrean Masak", path: "/chef/queue", roles: ['Chef'] },
   { icon: PackageSearch, label: "Stok Dapur", path: "/chef/stock", roles: ['Chef'] },
+  { icon: PackageSearch, label: "Pengajuan Restock", path: "/chef/restock", roles: ['Chef'] },
 ];
 
 export const Shell = ({ children, user, onLogout }: { children: React.ReactNode, user: any, onLogout: () => void }) => {

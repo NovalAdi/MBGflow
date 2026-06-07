@@ -1,6 +1,7 @@
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const dbConfig = {
@@ -56,7 +57,9 @@ async function createTables() {
         name VARCHAR(255) NOT NULL,
         address TEXT,
         capacity INT,
-        city VARCHAR(100)
+        city VARCHAR(100),
+        latitude DECIMAL(10, 8) NULL,
+        longitude DECIMAL(11, 8) NULL
       );
     `);
 
@@ -106,38 +109,45 @@ async function createTables() {
       );
     `);
 
-    // Ensure weight_value and unit columns exist on inventory_batches for existing setups
+    // Ensure columns exist (migrations)
     try {
       await connection.query("ALTER TABLE inventory_batches ADD COLUMN weight_value DECIMAL(10,4) NOT NULL DEFAULT 0.0000;");
-    } catch (e) {
-      // Ignore if column already exists
-    }
+    } catch (e) {}
     try {
       await connection.query("ALTER TABLE inventory_batches ADD COLUMN unit VARCHAR(50) NOT NULL DEFAULT 'kg';");
-    } catch (e) {
-      // Ignore if column already exists
-    }
+    } catch (e) {}
     try {
       await connection.query("ALTER TABLE inventory_batches ADD COLUMN package_capacity DECIMAL(10,4) NULL;");
-    } catch (e) {
-      // Ignore if column already exists
-    }
+    } catch (e) {}
     try {
       await connection.query("ALTER TABLE inventory_batches ADD COLUMN package_unit VARCHAR(50) NULL;");
-    } catch (e) {
-      // Ignore if column already exists
-    }
-
+    } catch (e) {}
     try {
       await connection.query("ALTER TABLE stock_requests ADD COLUMN kitchenId VARCHAR(50) NULL;");
-    } catch (e) {
-      // Ignore if column already exists
-    }
+    } catch (e) {}
     try {
       await connection.query("ALTER TABLE stock_requests ADD COLUMN kitchenName VARCHAR(255) NULL;");
-    } catch (e) {
-      // Ignore if column already exists
-    }
+    } catch (e) {}
+    try {
+      await connection.query("ALTER TABLE kitchens ADD COLUMN latitude DECIMAL(10, 8) NULL;");
+    } catch (e) {}
+    try {
+      await connection.query("ALTER TABLE kitchens ADD COLUMN longitude DECIMAL(11, 8) NULL;");
+    } catch (e) {}
+    try {
+      await connection.query("UPDATE kitchens SET latitude = -6.1668, longitude = 106.7865 WHERE id = 'k1' AND latitude IS NULL;");
+      await connection.query("UPDATE kitchens SET latitude = -6.3024, longitude = 106.6522 WHERE id = 'k2' AND latitude IS NULL;");
+      await connection.query("UPDATE kitchens SET latitude = -6.8915, longitude = 107.6106 WHERE id = 'k3' AND latitude IS NULL;");
+    } catch (e) {}
+    try {
+      await connection.query("ALTER TABLE stock_requests ADD COLUMN supplierKitchenId VARCHAR(50) NULL;");
+    } catch (e) {}
+    try {
+      await connection.query("ALTER TABLE stock_requests ADD COLUMN supplierKitchenName VARCHAR(255) NULL;");
+    } catch (e) {}
+    try {
+      await connection.query("ALTER TABLE stock_requests ADD COLUMN adminNotes TEXT NULL;");
+    } catch (e) {}
 
     // Migration: populate weight_value and unit from existing weight strings if they are 0
     const [rowsToMigrate] = await connection.query("SELECT id, weight FROM inventory_batches WHERE weight_value = 0.0000");
@@ -209,7 +219,10 @@ async function createTables() {
         status VARCHAR(50) NOT NULL DEFAULT 'Pending',
         createdAt VARCHAR(100) NOT NULL,
         kitchenId VARCHAR(50) NULL,
-        kitchenName VARCHAR(255) NULL
+        kitchenName VARCHAR(255) NULL,
+        supplierKitchenId VARCHAR(50) NULL,
+        supplierKitchenName VARCHAR(255) NULL,
+        adminNotes TEXT NULL
       );
     `);
 
@@ -241,52 +254,14 @@ async function createTables() {
 async function seedDatabase() {
   const connection = await pool.getConnection();
   try {
-    // Check if kitchens table is empty
     const [kitchenRows] = await connection.query('SELECT COUNT(*) as count FROM kitchens');
     if (kitchenRows[0].count > 0) {
-      // Database already has data. Check if we need to migration-reseed inventory
-      const [checkContainer] = await connection.query("SELECT COUNT(*) as count FROM inventory_batches WHERE container LIKE 'Cold Storage%' OR container LIKE 'Pantry%'");
-      const [checkCapacity] = await connection.query("SELECT COUNT(*) as count FROM inventory_batches WHERE package_capacity IS NOT NULL");
-      if (checkContainer[0].count > 0 || checkCapacity[0].count === 0) {
-        console.log("Old seeding detected. Re-seeding inventory to apply granular physical containers...");
-        const initialDataPath = path.join(__dirname, 'initial_data.json');
-        if (fs.existsSync(initialDataPath)) {
-          const rawData = fs.readFileSync(initialDataPath, 'utf8');
-          const data = JSON.parse(rawData);
-          
-          await connection.query('SET FOREIGN_KEY_CHECKS = 0;');
-          await connection.query('TRUNCATE TABLE inventory_batches;');
-          await connection.query('TRUNCATE TABLE inventory;');
-          
-          // Re-seed inventory & inventory_batches
-          for (const item of data.inventory) {
-            await connection.query(
-              'INSERT INTO inventory (id, name) VALUES (?, ?)',
-              [item.id, item.name]
-            );
-            for (const batch of item.batches) {
-              const weight_value = batch.weight_value !== undefined ? batch.weight_value : parseFloat(batch.weight) || 0;
-              const unit = batch.unit || batch.weight.replace(/[0-9.\s]+/g, '') || 'kg';
-              const weightStr = batch.weight || `${weight_value} ${unit}`;
-              const package_capacity = batch.package_capacity !== undefined ? batch.package_capacity : null;
-              const package_unit = batch.package_unit || null;
-              await connection.query(
-                'INSERT INTO inventory_batches (id, inventoryId, kitchenId, container, weight, weight_value, unit, expiry, package_capacity, package_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [batch.id, item.id, batch.kitchenId, batch.container, weightStr, weight_value, unit, batch.expiry, package_capacity, package_unit]
-              );
-            }
-          }
-          await connection.query('SET FOREIGN_KEY_CHECKS = 1;');
-          console.log('Inventory tables re-seeded with granular data successfully.');
-        }
-      } else {
-        console.log('Database already has data. Skipping seeding.');
-      }
+      console.log('Database already has data. Skipping seeding.');
       return;
     }
 
-    console.log('Seeding initial database data...');
-    const initialDataPath = path.join(__dirname, 'initial_data.json');
+    console.log('Seeding initial database data with hashed passwords...');
+    const initialDataPath = path.join(__dirname, '..', '..', 'initial_data.json');
     if (!fs.existsSync(initialDataPath)) {
       console.warn('initial_data.json not found in backend directory. Seeding skipped.');
       return;
@@ -300,8 +275,16 @@ async function seedDatabase() {
     // 1. Seed Kitchens
     for (const kitchen of data.kitchens) {
       await connection.query(
-        'INSERT INTO kitchens (id, name, address, capacity, city) VALUES (?, ?, ?, ?, ?)',
-        [kitchen.id, kitchen.name, kitchen.address, kitchen.capacity, kitchen.city]
+        'INSERT INTO kitchens (id, name, address, capacity, city, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          kitchen.id,
+          kitchen.name,
+          kitchen.address,
+          kitchen.capacity,
+          kitchen.city,
+          kitchen.latitude !== undefined ? kitchen.latitude : null,
+          kitchen.longitude !== undefined ? kitchen.longitude : null
+        ]
       );
     }
 
@@ -338,8 +321,10 @@ async function seedDatabase() {
       }
     }
 
-    // 4. Seed Staff
+    // 4. Seed Staff (with bcrypt password hashing)
     for (const staff of data.staff) {
+      const plainPassword = staff.password || 'password';
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
       await connection.query(
         'INSERT INTO staff (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
@@ -350,7 +335,7 @@ async function seedDatabase() {
           staff.avatar || '',
           staff.kitchenId || null,
           staff.email,
-          staff.password || 'password'
+          hashedPassword
         ]
       );
     }
@@ -374,7 +359,7 @@ async function seedDatabase() {
       );
     }
 
-    // 6. Seed default production logs from production plans (mirroring client-side logic)
+    // 6. Seed default production logs
     for (const plan of data.productionPlans) {
       const city = plan.kitchenName.includes('Jakarta')
         ? 'Jakarta'
@@ -399,7 +384,7 @@ async function seedDatabase() {
     }
 
     await connection.query('SET FOREIGN_KEY_CHECKS = 1;');
-    console.log('Database seeded successfully.');
+    console.log('Database seeded successfully with hashed passwords.');
   } catch (error) {
     console.error('Error seeding database:', error);
     throw error;

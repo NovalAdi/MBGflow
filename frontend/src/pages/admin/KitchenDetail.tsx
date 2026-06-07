@@ -583,6 +583,33 @@ export const KitchenDetail = () => {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Latitude</label>
+              <input 
+                type="number" 
+                step="any"
+                className="w-full bg-slate-50 border-2 border-transparent rounded-[20px] px-6 py-4 focus:bg-white focus:border-primary outline-none transition-all font-bold text-slate-800 tracking-tight text-sm placeholder:text-slate-300 shadow-sm"
+                placeholder="Contoh: -6.1668"
+                value={currentKitchen?.latitude !== undefined && currentKitchen?.latitude !== null ? currentKitchen.latitude : ""}
+                onChange={(e) => setCurrentKitchen((prev: any) => ({ ...prev, latitude: parseFloat(e.target.value) || 0 }))}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Longitude</label>
+              <input 
+                type="number" 
+                step="any"
+                className="w-full bg-slate-50 border-2 border-transparent rounded-[20px] px-6 py-4 focus:bg-white focus:border-primary outline-none transition-all font-bold text-slate-800 tracking-tight text-sm placeholder:text-slate-300 shadow-sm"
+                placeholder="Contoh: 106.7865"
+                value={currentKitchen?.longitude !== undefined && currentKitchen?.longitude !== null ? currentKitchen.longitude : ""}
+                onChange={(e) => setCurrentKitchen((prev: any) => ({ ...prev, longitude: parseFloat(e.target.value) || 0 }))}
+                required
+              />
+            </div>
+          </div>
+
           <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kapasitas Produksi</label>

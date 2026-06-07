@@ -32,11 +32,7 @@ export const ChefDashboard = ({ user }: { user: any }) => {
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   
-  // Quick restock form state
-  const [restockMaterial, setRestockMaterial] = React.useState("");
-  const [restockAmount, setRestockAmount] = React.useState("");
-  const [restockUrgency, setRestockUrgency] = React.useState<"Low" | "Medium" | "High">("Medium");
-  const [submittingRestock, setSubmittingRestock] = React.useState(false);
+
   const [successMsg, setSuccessMsg] = React.useState("");
   const [errorMsg, setErrorMsg] = React.useState("");
 
@@ -104,34 +100,7 @@ export const ChefDashboard = ({ user }: { user: any }) => {
     }, 4000);
   };
 
-  const handleRestockSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!restockMaterial || !restockAmount) {
-      alert("Harap lengkapi bahan dan jumlah pengajuan!");
-      return;
-    }
-    
-    setSubmittingRestock(true);
-    try {
-      await api.requestStock(
-        restockMaterial,
-        restockAmount,
-        restockUrgency,
-        user.kitchenId,
-        data?.kitchenName || `Dapur Chef ${user.name}`
-      );
-      
-      showNotification(`Sukses mengajukan restock ${restockMaterial}!`);
-      setRestockMaterial("");
-      setRestockAmount("");
-      setRestockUrgency("Medium");
-      loadDashboardData(true);
-    } catch (err: any) {
-      alert(err.message || "Gagal mengajukan restock.");
-    } finally {
-      setSubmittingRestock(false);
-    }
-  };
+
 
   if (loading) {
     return (
@@ -546,150 +515,9 @@ export const ChefDashboard = ({ user }: { user: any }) => {
             </div>
           </Card>
 
-          {/* Quick Restock Request panel */}
-          <Card className="p-6 rounded-[28px] border-2 border-slate-50/50 space-y-4">
-            <div>
-              <h3 className="text-lg font-black text-slate-800 tracking-tighter">Pengajuan Restock Cepat</h3>
-              <p className="text-slate-650 font-bold text-[9px] uppercase tracking-widest mt-0.5">Pesan bahan baku darurat langsung ke SCM</p>
-            </div>
-
-            <form onSubmit={handleRestockSubmit} className="space-y-4">
-              <div>
-                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">Nama Bahan Baku</label>
-                <select
-                  value={restockMaterial}
-                  onChange={(e) => setRestockMaterial(e.target.value)}
-                  required
-                  className="w-full bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-bold tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
-                >
-                  <option value="" disabled className="text-slate-400">Pilih bahan baku...</option>
-                  {inventoryItems.map(item => (
-                    <option key={item.id} value={item.name} className="font-semibold">{item.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">Jumlah & Satuan</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 5 jerigen, 10 kg"
-                    value={restockAmount}
-                    onChange={(e) => setRestockAmount(e.target.value)}
-                    required
-                    className="w-full bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-bold tracking-tight placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">Urgensi</label>
-                  <select
-                    value={restockUrgency}
-                    onChange={(e: any) => setRestockUrgency(e.target.value)}
-                    className="w-full bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 font-bold tracking-tight focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
-                  >
-                    <option value="Low">Low (Rutin)</option>
-                    <option value="Medium">Medium (Sedang)</option>
-                    <option value="High">High (Kritis/Habis)</option>
-                  </select>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={submittingRestock || !restockMaterial || !restockAmount}
-                className="w-full h-11 bg-primary hover:bg-primary-dark text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/10 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-              >
-                <Send className="w-3.5 h-3.5 mr-2" />
-                {submittingRestock ? "Mengirim..." : "Kirim Permintaan"}
-              </Button>
-            </form>
-          </Card>
-
         </div>
 
       </div>
-
-      {/* Bottom Full-width Row: Recent Restock Requests Log Tracker */}
-      <Card className="p-6 md:p-8 rounded-[32px] border-2 border-slate-50/50 space-y-6">
-        <div>
-          <h3 className="text-xl font-black text-slate-800 tracking-tighter">Papan Pelacakan Pengiriman Bahan</h3>
-          <p className="text-slate-650 font-bold text-[10px] uppercase tracking-widest mt-1">Status real-time restock darurat dapur anda ke logistik pusat</p>
-        </div>
-
-        {recentRequests.length === 0 ? (
-          <div className="py-12 text-center border-2 border-dashed border-slate-100 rounded-3xl space-y-2">
-            <Package className="w-10 h-10 text-slate-350 mx-auto" />
-            <p className="text-slate-600 font-bold text-sm">Belum ada pengajuan restock cepat.</p>
-            <p className="text-slate-600 text-xs">Setiap restock darurat yang diajukan di atas akan muncul pelacakannya di sini.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[700px]">
-              <thead>
-                <tr className="border-b border-slate-150">
-                  <th className="py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">ID Tiket</th>
-                  <th className="py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Bahan Baku</th>
-                  <th className="py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Jumlah</th>
-                  <th className="py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Urgensi</th>
-                  <th className="py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Diajukan Pada</th>
-                  <th className="py-4 text-[10px] font-black text-slate-600 uppercase tracking-widest">Status Pengiriman</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {recentRequests.map((req: any) => {
-                  let statusColor = "bg-slate-100 text-slate-500";
-                  let StatusIcon = Hourglass;
-                  
-                  if (req.status === "Approved") {
-                    statusColor = "bg-blue-50 text-blue-600 border border-blue-100";
-                    StatusIcon = Truck;
-                  } else if (req.status === "Delivered" || req.status === "Selesai") {
-                    statusColor = "bg-emerald-50 text-emerald-600 border border-emerald-100";
-                    StatusIcon = CheckCircle2;
-                  } else if (req.status === "Pending") {
-                    statusColor = "bg-amber-50 text-amber-600 border border-amber-100";
-                    StatusIcon = Hourglass;
-                  }
-
-                  const urgencyColor = req.urgency === "High" 
-                    ? "text-red-600 bg-red-50 border border-red-100 font-black text-[9px]" 
-                    : req.urgency === "Medium"
-                    ? "text-amber-600 bg-amber-50 border border-amber-100 font-black text-[9px]"
-                    : "text-slate-650 bg-slate-50 border border-slate-100 font-black text-[9px]";
-
-                  return (
-                    <tr key={req.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 text-xs font-black text-slate-800 tracking-tight">#{req.id}</td>
-                      <td className="py-4 text-xs font-extrabold text-slate-800 tracking-tight">{req.material}</td>
-                      <td className="py-4 text-xs font-bold text-slate-650 tracking-tight">{req.amount}</td>
-                      <td className="py-4">
-                        <span className={cn("px-2.5 py-1 rounded-full uppercase tracking-wider font-extrabold text-[9px]", urgencyColor)}>
-                          {req.urgency}
-                        </span>
-                      </td>
-                      <td className="py-4 text-xs text-slate-500 font-medium">
-                        {new Date(req.createdAt).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}
-                      </td>
-                      <td className="py-4">
-                        <div className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold", statusColor)}>
-                          <StatusIcon className="w-3.5 h-3.5" />
-                          <span>{req.status === "Pending" ? "Menunggu Persetujuan" : req.status === "Approved" ? "Dalam Pengiriman" : "Telah Diterima"}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
 
     </div>
   );

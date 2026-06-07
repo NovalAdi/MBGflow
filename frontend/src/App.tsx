@@ -16,11 +16,27 @@ import { RequestStock } from "./pages/admin/RequestStock";
 import { ChefQueue } from "./pages/chef/Queue";
 import { ChefStock } from "./pages/chef/Stock";
 import { ChefDashboard } from "./pages/chef/Dashboard";
+import { Restock } from "./pages/chef/Restock";
 import { Login } from "./pages/Login";
 
+// Router setup for MBGflow app
 const AppContent = () => {
   const [user, setUser] = React.useState<any>(null);
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+
+  React.useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    const storedUser = localStorage.getItem("auth_user");
+    if (token && storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+        setIsLoggedIn(true);
+      } catch (e) {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
+      }
+    }
+  }, []);
 
   const handleLogin = (userData: any) => {
     setUser(userData);
@@ -28,6 +44,8 @@ const AppContent = () => {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
     setUser(null);
     setIsLoggedIn(false);
   };
@@ -66,6 +84,7 @@ const AppContent = () => {
             <Route path="/chef/dashboard" element={<ChefDashboard user={user} />} />
             <Route path="/chef/queue" element={<ChefQueue user={user} />} />
             <Route path="/chef/stock" element={<ChefStock user={user} />} />
+            <Route path="/chef/restock" element={<Restock user={user} />} />
             <Route path="*" element={<Navigate to="/chef/dashboard" replace />} />
           </>
         )}
