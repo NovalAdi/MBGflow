@@ -518,22 +518,22 @@ export const KitchenDetail = () => {
 
       {/* Staff Modal */}
       <Modal isOpen={isStaffModalOpen} onClose={() => setStaffModalOpen(false)} title="Tambah Staff Baru">
-        <form className="space-y-8 py-4 px-2" onSubmit={handleAddStaff}>
-          <div className="space-y-3">
-            <label className="text-[11px] font-black text-slate-600 uppercase tracking-widest px-1">Nama Lengkap Staff</label>
+        <form className="space-y-6 py-2" onSubmit={handleAddStaff}>
+          <div className="space-y-2">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Nama Lengkap Staff</label>
             <input 
               type="text" 
-              className="w-full bg-slate-50 border-2 border-transparent rounded-[24px] p-5 focus:bg-white focus:border-primary outline-none transition-all font-black text-slate-800 tracking-tight placeholder:text-slate-450" 
+              className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all" 
               placeholder="Masukkan nama lengkap..." 
               value={newStaffName}
               onChange={(e) => setNewStaffName(e.target.value)}
               required
             />
           </div>
-          <div className="space-y-3">
-            <label className="text-[11px] font-black text-slate-600 uppercase tracking-widest px-1">Peran / Jabatan</label>
+          <div className="space-y-2">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Peran / Jabatan</label>
             <select 
-              className="w-full bg-slate-50 border-2 border-transparent rounded-[24px] p-5 focus:bg-white focus:border-primary outline-none transition-all font-black text-slate-800 tracking-tight cursor-pointer"
+              className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all cursor-pointer"
               value={newStaffRole}
               onChange={(e) => setNewStaffRole(e.target.value)}
             >
@@ -541,8 +541,8 @@ export const KitchenDetail = () => {
               <option>Staff</option>
             </select>
           </div>
-          <div className="pt-6">
-            <Button type="submit" className="w-full py-5 rounded-[20px] font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20">Simpan Detail Staff</Button>
+          <div className="pt-2">
+            <Button type="submit" className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs">Simpan Detail Staff</Button>
           </div>
         </form>
       </Modal>
@@ -637,14 +637,14 @@ export const KitchenDetail = () => {
             <Button 
               type="button" 
               variant="ghost" 
-              className="flex-1 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] text-slate-400 hover:bg-slate-50"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs text-slate-400 hover:bg-slate-50"
               onClick={() => setEditModalOpen(false)}
             >
               Batalkan
             </Button>
             <Button 
               type="submit" 
-              className="flex-1 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 transition-all active:scale-95"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs"
             >
               Simpan Perubahan
             </Button>
@@ -706,8 +706,8 @@ export const KitchenDetail = () => {
                </div>
             </div>
 
-            <div className="pt-4">
-               <Button className="w-full py-6 rounded-[24px] font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20">
+            <div className="pt-2">
+               <Button className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs">
                   Kirim Status QC
                </Button>
             </div>
@@ -792,14 +792,14 @@ export const KitchenDetail = () => {
             <Button 
               type="button" 
               variant="ghost" 
-              className="flex-1 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] text-slate-400 hover:bg-slate-50 border-none"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs text-slate-400 hover:bg-slate-50 border-none"
               onClick={() => setStationModalOpen(false)}
             >
               Batalkan
             </Button>
             <Button 
               type="submit" 
-              className="flex-1 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 transition-all active:scale-95"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs"
             >
               Simpan Penugasan
             </Button>
@@ -873,7 +873,9 @@ const StockRow = ({ item }: { item: InventoryItem, key?: string }) => {
                       </div>
                       <div>
                         <span className="font-black text-slate-800 tracking-tight text-base leading-none">
-                          {b.package_capacity ? `${b.container} (${b.package_capacity} ${b.package_unit})` : b.container}
+                          {b.package_capacity 
+                            ? `${b.qty_packed > 0 ? `${b.qty_packed} ` : ''}${b.container} (@ ${b.package_capacity} ${b.package_unit})${b.qty_loose > 0 ? ` + ${b.qty_loose} ${b.package_unit}` : ''}`
+                            : b.container}
                         </span>
                         <div className="flex items-center gap-2 mt-1">
                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{b.weight}</p>

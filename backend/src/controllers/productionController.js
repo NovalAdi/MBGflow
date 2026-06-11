@@ -467,6 +467,84 @@ async function createNotification(req, res) {
   }
 }
 
+async function getDailyRecap(req, res) {
+  await delay(50);
+  try {
+    // 1. Fetch stock verifications joined with kitchens
+    const [verifications] = await db.query(`
+      SELECT 
+        sv.id,
+        sv.kitchenId,
+        sv.verifiedAt,
+        sv.verifiedBy,
+        sv.details,
+        k.name as kitchenName,
+        k.city as kitchenCity
+      FROM stock_verifications sv
+      JOIN kitchens k ON sv.kitchenId = k.id
+      ORDER BY sv.verifiedAt DESC
+    `);
+
+    // 2. Fetch inventory batches joined with inventory to map batchId to materialName
+    const [batches] = await db.query(`
+      SELECT 
+        b.id as batchId,
+        b.container,
+        b.unit,
+        i.name as materialName,
+        i.packaging_name as packagingName,
+        b.package_capacity as packageCapacity
+      FROM inventory_batches b
+      JOIN inventory i ON b.inventoryId = i.id
+    `);
+
+    // Create a map for quick lookup
+    const batchMap = {};
+    batches.forEach(b => {
+      batchMap[b.batchId] = b;
+    });
+
+    // 3. Map verifications and enrich the details
+    const recapData = verifications.map(v => {
+      let itemsList = [];
+      try {
+        itemsList = typeof v.details === 'string' ? JSON.parse(v.details) : v.details;
+      } catch (e) {
+        itemsList = [];
+      }
+
+      const enrichedItems = itemsList.map(item => {
+        const batchInfo = batchMap[item.batchId];
+        return {
+          batchId: item.batchId,
+          qty_packed: item.qty_packed,
+          qty_loose: item.qty_loose,
+          materialName: batchInfo ? batchInfo.materialName : 'Bahan Baku (ID: ' + item.batchId + ')',
+          container: batchInfo ? batchInfo.container : 'Wadah',
+          unit: batchInfo ? batchInfo.unit : 'kg',
+          packagingName: batchInfo ? batchInfo.packagingName : null,
+          packageCapacity: batchInfo ? batchInfo.packageCapacity : null
+        };
+      });
+
+      return {
+        id: v.id,
+        kitchenId: v.kitchenId,
+        kitchenName: v.kitchenName,
+        kitchenCity: v.kitchenCity,
+        verifiedAt: v.verifiedAt,
+        verifiedBy: v.verifiedBy,
+        items: enrichedItems
+      };
+    });
+
+    res.json(recapData);
+  } catch (error) {
+    console.error('Daily recap error:', error);
+    res.status(500).json({ error: 'Server error fetching daily recap.' });
+  }
+}
+
 module.exports = {
   getActivity,
   getProductionPlans,
@@ -479,5 +557,6 @@ module.exports = {
   getNotifications,
   markNotificationRead,
   deleteNotification,
-  createNotification
+  createNotification,
+  getDailyRecap
 };

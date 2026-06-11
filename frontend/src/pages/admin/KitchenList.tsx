@@ -271,14 +271,14 @@ export const KitchenList = () => {
             <Button 
               type="button" 
               variant="ghost" 
-              className="flex-1 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] text-slate-600 hover:bg-slate-50"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs text-slate-400 hover:bg-slate-50"
               onClick={() => setIsModalOpen(false)}
             >
               Batalkan
             </Button>
             <Button 
               type="submit" 
-              className="flex-1 py-4 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 transition-all active:scale-95"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs"
             >
               {currentKitchen?.id ? "Simpan Perubahan" : "Konfirmasi & Simpan"}
             </Button>

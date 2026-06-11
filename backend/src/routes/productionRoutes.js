@@ -13,6 +13,7 @@ router.delete('/production-plans/:id', productionController.deleteProductionPlan
 router.post('/production-logs/finish', productionController.finishProductionLog);
 router.post('/production-logs/start', productionController.startProductionLog);
 router.get('/menus', productionController.getMenus);
+router.get('/daily-recap', productionController.getDailyRecap);
 
 // Notifications endpoints
 router.get('/notifications', productionController.getNotifications);

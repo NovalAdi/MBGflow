@@ -66,6 +66,8 @@ export interface StockBatch {
   weight: string;
   weight_value?: number;
   unit?: string;
+  qty_packed?: number;
+  qty_loose?: number;
   package_capacity?: number;
   package_unit?: string;
   expiry: string;

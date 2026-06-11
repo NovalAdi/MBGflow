@@ -17,21 +17,7 @@ function formatSingleBatch(qty_packed, qty_loose, container, package_capacity, p
       totalStr = `${parseFloat(totalVal.toFixed(2))} ${pkgU}`;
     }
     
-    const parts = [];
-    if (qPacked > 0) {
-      parts.push(`${qPacked} ${container}`);
-    }
-    if (qLoose > 0 || qPacked === 0) {
-      if (pkgULower === 'kg' && qLoose < 1 && qLoose > 0) {
-        parts.push(`${Math.round(qLoose * 1000)} g`);
-      } else if (pkgULower === 'l' && qLoose < 1 && qLoose > 0) {
-        parts.push(`${Math.round(qLoose * 1000)} ml`);
-      } else {
-        parts.push(`${parseFloat(qLoose.toFixed(2))} ${pkgU}`);
-      }
-    }
-    
-    return `${parts.join(' + ')} (Total: ${totalStr})`;
+    return totalStr;
   }
   
   // Non-packaged / fallback

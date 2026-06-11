@@ -49,6 +49,10 @@ export const api = {
     const query = kitchenId ? `?kitchenId=${encodeURIComponent(kitchenId)}` : "";
     return request<ProductionLog[]>(`/activity${query}`);
   },
+  
+  getDailyRecap: async (): Promise<any[]> => {
+    return request<any[]>("/daily-recap");
+  },
 
   getProductionPlans: async (kitchenId?: string): Promise<any[]> => {
     const query = kitchenId ? `?kitchenId=${encodeURIComponent(kitchenId)}` : "";
@@ -218,6 +222,21 @@ export const api = {
     return request<any>("/notifications", {
       method: "POST",
       body: JSON.stringify({ kitchenId, message }),
+    });
+  },
+
+  checkStockVerificationStatus: async (kitchenId: string): Promise<{ verified: boolean }> => {
+    return request<{ verified: boolean }>(`/stock-verifications/status?kitchenId=${encodeURIComponent(kitchenId)}`);
+  },
+
+  getLastCookedMenu: async (kitchenId: string): Promise<{ lastMenu: string | null; detailedIngredients: any[]; otherIngredients: any[] }> => {
+    return request<{ lastMenu: string | null; detailedIngredients: any[]; otherIngredients: any[] }>(`/stock-verifications/last-cooked?kitchenId=${encodeURIComponent(kitchenId)}`);
+  },
+
+  submitStockVerification: async (data: { kitchenId: string; verifiedBy: string; items: { batchId: string; qty_packed?: number; qty_loose?: number }[] }): Promise<{ success: boolean; verificationId: string }> => {
+    return request<{ success: boolean; verificationId: string }>("/stock-verifications", {
+      method: "POST",
+      body: JSON.stringify(data),
     });
   },
 };

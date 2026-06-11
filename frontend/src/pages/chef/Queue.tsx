@@ -21,14 +21,29 @@ export const ChefQueue = ({ user }: { user: any }) => {
   const [isDetailModalOpen, setDetailModalOpen] = React.useState(false);
   const [handoverData, setHandoverData] = React.useState<{ id: string; qr: string } | null>(null);
 
+  // Stock Verification States
+  const [isVerified, setIsVerified] = React.useState(true);
+  const [isVerificationModalOpen, setVerificationModalOpen] = React.useState(false);
+  const [verificationData, setVerificationData] = React.useState<{
+    lastMenu: string | null;
+    detailedIngredients: any[];
+    otherIngredients: any[];
+  } | null>(null);
+  const [pendingTaskId, setPendingTaskId] = React.useState<string | null>(null);
+  const [detailedInputs, setDetailedInputs] = React.useState<Record<string, { qty_packed: string; qty_loose: string }>>({});
+  const [otherInputs, setOtherInputs] = React.useState<Record<string, string>>({});
+  const [isVerifying, setIsVerifying] = React.useState(false);
+
   const fetchTasks = React.useCallback(async () => {
     try {
-      const [tasksData, menusData] = await Promise.all([
+      const [tasksData, menusData, verificationStatus] = await Promise.all([
         api.getActivity(user?.kitchenId),
-        api.getMenus()
+        api.getMenus(),
+        api.checkStockVerificationStatus(user?.kitchenId)
       ]);
       setTasks(tasksData || []);
       setMenus(menusData || []);
+      setIsVerified(verificationStatus.verified);
     } catch (error) {
       console.error("Failed to fetch tasks and menus", error);
     }
@@ -38,14 +53,117 @@ export const ChefQueue = ({ user }: { user: any }) => {
     fetchTasks();
   }, [fetchTasks]);
 
-  const handleAction = (task: ExtendedProductionLog) => {
+  const handleAction = async (task: ExtendedProductionLog) => {
     if (task.status === 'NotStarted' || task.status === 'Preparing') {
-      api.startTask(task.id).then(() => {
-        fetchTasks();
-      });
+      try {
+        const status = await api.checkStockVerificationStatus(user?.kitchenId);
+        if (status.verified) {
+          api.startTask(task.id).then(() => {
+            fetchTasks();
+          });
+        } else {
+          setPendingTaskId(task.id);
+          const data = await api.getLastCookedMenu(user?.kitchenId);
+          setVerificationData(data);
+          
+          // Pre-populate detailed inputs
+          const newDetailedInputs: Record<string, { qty_packed: string; qty_loose: string }> = {};
+          data.detailedIngredients.forEach((ing: any) => {
+            newDetailedInputs[ing.batchId] = {
+              qty_packed: String(ing.qty_packed),
+              qty_loose: String(ing.qty_loose)
+            };
+          });
+          setDetailedInputs(newDetailedInputs);
+
+          // Pre-populate other inputs
+          const newOtherInputs: Record<string, string> = {};
+          data.otherIngredients.forEach((ing: any) => {
+            const cap = Number(ing.package_capacity) || 0;
+            const totalVal = cap > 0 ? (ing.qty_packed * cap) + ing.qty_loose : ing.qty_loose;
+            newOtherInputs[ing.batchId] = String(totalVal);
+          });
+          setOtherInputs(newOtherInputs);
+
+          setVerificationModalOpen(true);
+        }
+      } catch (err) {
+        console.error("Failed to perform stock verification check", err);
+        // Fallback: start task anyway
+        api.startTask(task.id).then(() => {
+          fetchTasks();
+        });
+      }
     } else if (task.status === 'Cooking' || task.status === 'Ready') {
       setSelectedTask(task);
       setQAModalOpen(true);
+    }
+  };
+
+  const submitVerification = async () => {
+    if (!user?.kitchenId || !pendingTaskId || !verificationData) return;
+    setIsVerifying(true);
+
+    try {
+      const items: any[] = [];
+
+      // Collect detailed ingredients
+      Object.keys(detailedInputs).forEach((batchId) => {
+        const val = detailedInputs[batchId];
+        items.push({
+          batchId,
+          qty_packed: Number(val.qty_packed) || 0,
+          qty_loose: Number(val.qty_loose) || 0
+        });
+      });
+
+      // Collect other ingredients
+      Object.keys(otherInputs).forEach((batchId) => {
+        const val = otherInputs[batchId];
+        const batch = verificationData.otherIngredients.find(b => b.batchId === batchId);
+        const totalVal = Number(val) || 0;
+        
+        if (batch) {
+          const cap = Number(batch.package_capacity);
+          if (cap > 0) {
+            items.push({
+              batchId,
+              qty_packed: Math.floor(totalVal / cap),
+              qty_loose: Number((totalVal % cap).toFixed(4))
+            });
+          } else {
+            items.push({
+              batchId,
+              qty_packed: 0,
+              qty_loose: totalVal
+            });
+          }
+        } else {
+          items.push({
+            batchId,
+            qty_loose: totalVal
+          });
+        }
+      });
+
+      await api.submitStockVerification({
+        kitchenId: user.kitchenId,
+        verifiedBy: user.name,
+        items
+      });
+
+      // After verification, start the task if we have a valid pendingTaskId
+      if (pendingTaskId && pendingTaskId !== "dummy") {
+        await api.startTask(pendingTaskId);
+      }
+      
+      setIsVerified(true);
+      setVerificationModalOpen(false);
+      fetchTasks();
+    } catch (err: any) {
+      alert(err?.message || "Gagal melakukan verifikasi stok.");
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -124,144 +242,222 @@ export const ChefQueue = ({ user }: { user: any }) => {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tasks.map((task) => {
-          const config = getStatusConfig(task.status);
-          const StatusIcon = config.icon;
-
-          const menuData = menus.find(m => m.name.toLowerCase() === task.menu.toLowerCase());
-          const ingredients = menuData ? menuData.ingredients.map((ing: any) => {
-            const needed = ing.perPortion * task.servings;
-            return {
-              name: ing.name,
-              amount: `${needed.toFixed(2)} ${ing.unit}`
-            };
-          }) : [];
-
-          return (
-            <Card key={task.id} className="p-8 group hover:shadow-2xl hover:shadow-primary/10 transition-all rounded-[40px] border-0 bg-white flex flex-col justify-between h-full relative overflow-hidden shadow-sm">
-              <div>
-                <div className="flex justify-between items-start mb-6">
-                  <div className={cn("px-4 py-1.5 rounded-full font-black text-[9px] tracking-[0.2em] border-none uppercase shadow-sm", config.color)}>
-                    • {config.label}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">PIC</p>
-                    <p className="text-xs font-black text-slate-800 tracking-tight">{user?.name}</p>
-                  </div>
-                </div>
+      {/* Verification Warning Alert */}
+      {!isVerified && (
+        <Card className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-amber-100 text-amber-600 rounded-2xl shrink-0">
+              <ClipboardList className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="font-extrabold text-slate-800 text-sm tracking-tight">Verifikasi Stok Harian Dapur Belum Dilakukan!</h4>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Harap selaraskan sisa stok fisik dapur Anda sebelum memproses antrean masak hari ini.</p>
+            </div>
+          </div>
+          <Button 
+            onClick={async () => {
+              try {
+                const data = await api.getLastCookedMenu(user?.kitchenId);
+                setVerificationData(data);
                 
-                <div className="space-y-3 mb-6">
-                  <h3 className="text-2xl font-black text-slate-800 tracking-tighter group-hover:text-primary transition-colors leading-[1.0] font-sans">
-                    {task.menu}
-                  </h3>
-                  <div className="flex items-center gap-3 mt-4">
-                    <span className="text-xl font-black text-slate-700 tracking-tighter">{task.servings} <span className="text-[10px] uppercase font-bold tracking-widest ml-0.5 text-slate-650">Porsi</span></span>
-                    <span className="w-1 h-1 rounded-full bg-slate-200" />
-                    <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Shift Pagi</span>
+                const newDetailedInputs: Record<string, { qty_packed: string; qty_loose: string }> = {};
+                data.detailedIngredients.forEach((ing: any) => {
+                  newDetailedInputs[ing.batchId] = {
+                    qty_packed: String(ing.qty_packed),
+                    qty_loose: String(ing.qty_loose)
+                  };
+                });
+                setDetailedInputs(newDetailedInputs);
+
+                const newOtherInputs: Record<string, string> = {};
+                data.otherIngredients.forEach((ing: any) => {
+                  const cap = Number(ing.package_capacity) || 0;
+                  const totalVal = cap > 0 ? (ing.qty_packed * cap) + ing.qty_loose : ing.qty_loose;
+                  newOtherInputs[ing.batchId] = String(totalVal);
+                });
+                setOtherInputs(newOtherInputs);
+
+                // Set a default pending task id as the first NotStarted task
+                const firstNotStarted = tasks.find(t => t.status === 'NotStarted' || t.status === 'Preparing');
+                if (firstNotStarted) {
+                  setPendingTaskId(firstNotStarted.id);
+                } else if (tasks.length > 0) {
+                  setPendingTaskId(tasks[0].id);
+                } else {
+                  setPendingTaskId("dummy");
+                }
+
+                setVerificationModalOpen(true);
+              } catch (err) {
+                console.error("Failed to load verification items", err);
+              }
+            }}
+            className="py-3.5 px-6 rounded-2xl font-black uppercase tracking-widest text-xs bg-amber-600 hover:bg-amber-700 text-white shrink-0 cursor-pointer w-full sm:w-auto"
+          >
+            Verifikasi Sekarang
+          </Button>
+        </Card>
+      )}
+
+      <div className="relative">
+        <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-all duration-300", !isVerified && "blur-[6px] pointer-events-none opacity-40 select-none")}>
+          {tasks.map((task) => {
+            const config = getStatusConfig(task.status);
+            const StatusIcon = config.icon;
+
+            const menuData = menus.find(m => m.name.toLowerCase() === task.menu.toLowerCase());
+            const ingredients = menuData ? menuData.ingredients.map((ing: any) => {
+              const needed = ing.perPortion * task.servings;
+              return {
+                name: ing.name,
+                amount: `${needed.toFixed(2)} ${ing.unit}`
+              };
+            }) : [];
+
+            return (
+              <Card key={task.id} className="p-8 group hover:shadow-2xl hover:shadow-primary/10 transition-all rounded-[40px] border-0 bg-white flex flex-col justify-between h-full relative overflow-hidden shadow-sm">
+                <div>
+                  <div className="flex justify-between items-start mb-6">
+                    <div className={cn("px-4 py-1.5 rounded-full font-black text-[9px] tracking-[0.2em] border-none uppercase shadow-sm", config.color)}>
+                      • {config.label}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">PIC</p>
+                      <p className="text-xs font-black text-slate-800 tracking-tight">{user?.name}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3 mb-6">
+                    <h3 className="text-2xl font-black text-slate-800 tracking-tighter group-hover:text-primary transition-colors leading-[1.0] font-sans">
+                      {task.menu}
+                    </h3>
+                    <div className="flex items-center gap-3 mt-4">
+                      <span className="text-xl font-black text-slate-700 tracking-tighter">{task.servings} <span className="text-[10px] uppercase font-bold tracking-widest ml-0.5 text-slate-650">Porsi</span></span>
+                      <span className="w-1 h-1 rounded-full bg-slate-200" />
+                      <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Shift Pagi</span>
+                    </div>
+                  </div>
+
+                  {/* Ingredients List Section */}
+                  <div className="mb-6 pt-4 border-t border-slate-100">
+                    <p className="text-[9px] font-black text-slate-450 uppercase tracking-[0.2em] mb-3">Rincian Bahan Baku</p>
+                    {ingredients.length > 0 ? (
+                      <div className="max-h-28 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                        {ingredients.map((ing: any, i: number) => (
+                          <div key={i} className="flex justify-between items-center bg-slate-50 rounded-xl px-4 py-2 border border-slate-100/50">
+                            <span className="text-xs font-bold text-slate-700">{ing.name}</span>
+                            <span className="text-xs font-black text-primary tracking-tight">{ing.amount}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-slate-550 italic">Memuat rincian bahan...</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Ingredients List Section */}
-                <div className="mb-6 pt-4 border-t border-slate-100">
-                  <p className="text-[9px] font-black text-slate-450 uppercase tracking-[0.2em] mb-3">Rincian Bahan Baku</p>
-                  {ingredients.length > 0 ? (
-                    <div className="max-h-28 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                      {ingredients.map((ing: any, i: number) => (
-                        <div key={i} className="flex justify-between items-center bg-slate-50 rounded-xl px-4 py-2 border border-slate-100/50">
-                          <span className="text-xs font-bold text-slate-700">{ing.name}</span>
-                          <span className="text-xs font-black text-primary tracking-tight">{ing.amount}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-slate-550 italic">Memuat rincian bahan...</p>
-                  )}
+                {/* Action Buttons at the bottom */}
+                <div className="grid grid-cols-5 gap-3 mt-auto pt-2">
+                  <Button 
+                     className={cn(
+                      "col-span-4 h-12 rounded-[20px] text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center cursor-pointer",
+                      task.status === 'Ready' 
+                        ? "bg-green-500 hover:bg-green-600 shadow-green-500/20 text-white" 
+                        : task.status === 'Cooking'
+                        ? "bg-orange-500 hover:bg-orange-600 shadow-orange-500/20 text-white"
+                        : "bg-primary hover:bg-primary-dark shadow-primary/20 text-white"
+                    )}
+                    onClick={() => handleAction({ ...task, ingredients })}
+                  >
+                    <StatusIcon className="w-4 h-4 mr-2" />
+                    {config.btnText}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-12 aspect-square rounded-[20px] bg-slate-50 text-slate-500 hover:bg-primary/5 hover:text-primary border-none shadow-sm transition-all flex items-center justify-center"
+                    onClick={() => openInfo({ ...task, ingredients })}
+                  >
+                    <Info className="w-5 h-5" />
+                  </Button>
                 </div>
-              </div>
+              </Card>
+            );
+          })}
+        </div>
 
-              {/* Action Buttons at the bottom */}
-              <div className="grid grid-cols-5 gap-3 mt-auto pt-2">
-                <Button 
-                   className={cn(
-                    "col-span-4 h-12 rounded-[20px] text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center cursor-pointer",
-                    task.status === 'Ready' 
-                      ? "bg-green-500 hover:bg-green-600 shadow-green-500/20 text-white" 
-                      : task.status === 'Cooking'
-                      ? "bg-orange-500 hover:bg-orange-600 shadow-orange-500/20 text-white"
-                      : "bg-primary hover:bg-primary-dark shadow-primary/20 text-white"
-                  )}
-                  onClick={() => handleAction({ ...task, ingredients })}
-                >
-                  <StatusIcon className="w-4 h-4 mr-2" />
-                  {config.btnText}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-12 aspect-square rounded-[20px] bg-slate-50 text-slate-500 hover:bg-primary/5 hover:text-primary border-none shadow-sm transition-all flex items-center justify-center"
-                  onClick={() => openInfo({ ...task, ingredients })}
-                >
-                  <Info className="w-5 h-5" />
-                </Button>
-              </div>
-            </Card>
-          );
-        })}
+        {!isVerified && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-8 bg-slate-100/5 backdrop-blur-[2px] rounded-[32px] border-2 border-dashed border-slate-200">
+            <div className="p-4 bg-primary-light text-primary rounded-full mb-4 shadow-md">
+              <ClipboardList className="w-8 h-8 animate-bounce" />
+            </div>
+            <h4 className="text-xl font-black text-slate-800 tracking-tight">Antrean Masak Dikunci</h4>
+            <p className="text-sm text-slate-550 font-medium text-center mt-2 max-w-sm">
+              Selesaikan pengecekan sisa stok dapur terlebih dahulu menggunakan tombol verifikasi di atas.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Info Modal */}
       <Modal
         isOpen={isDetailModalOpen}
         onClose={() => setDetailModalOpen(false)}
-        title="Detail Produksi & Bahan"
-        className="max-w-2xl"
+        title="Detail Laporan Produksi"
+        className="max-w-xl"
       >
         {selectedTask && (
-          <div className="space-y-10 py-4">
-            <div className="grid grid-cols-2 gap-6">
-              <div className="p-8 bg-slate-50/50 rounded-[32px] border border-slate-50 space-y-2">
-                <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">Target Produksi</p>
-                <p className="text-4xl font-black text-slate-800 tracking-tighter">{selectedTask.servings} <span className="text-sm uppercase font-bold text-slate-600">Porsi</span></p>
+          <div className="space-y-6 py-2">
+            {/* Quick stats */}
+            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Target Produksi</span>
+                <span className="text-sm font-extrabold text-slate-800">{selectedTask.servings} Porsi</span>
               </div>
-              <div className="p-8 bg-slate-50/50 rounded-[32px] border border-slate-50 space-y-2">
-                <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">Waktu Mulai</p>
-                <p className="text-4xl font-black text-primary tracking-tighter">{new Date(selectedTask.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="flex items-center justify-between px-2">
-                 <h4 className="text-xs font-black text-slate-800 uppercase tracking-[0.2em]">Bahan Baku Dibutuhkan</h4>
-                 <Badge status="Tervalidasi" className="bg-green-50 text-green-600 border-none font-black text-[9px] tracking-widest uppercase" />
-              </div>
-              
-              <div className="grid grid-cols-1 gap-3">
-                {selectedTask.ingredients ? (
-                  selectedTask.ingredients.map((ing, i) => (
-                    <div key={i} className="flex items-center justify-between p-6 bg-white border border-slate-100 rounded-[28px] hover:border-primary/20 transition-all group">
-                       <span className="text-lg font-black text-slate-700 tracking-tight group-hover:text-primary transition-colors">{ing.name}</span>
-                       <span className="px-6 py-2 bg-slate-50 rounded-2xl text-sm font-black text-slate-500 tracking-tighter">{ing.amount}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest italic">Data bahan tidak tersedia</p>
-                  </div>
-                )}
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Waktu Mulai</span>
+                <span className="text-sm font-extrabold text-slate-800">
+                  {selectedTask.startTime ? new Date(selectedTask.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-"} WIB
+                </span>
               </div>
             </div>
 
-            <div className="pt-6">
-               <Button className="w-full py-6 rounded-[24px] font-black uppercase tracking-widest" variant="ghost" onClick={() => setDetailModalOpen(false)}>
+            <div className="space-y-3">
+              <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">
+                Bahan Baku Dibutuhkan
+              </h5>
+              {selectedTask.ingredients && selectedTask.ingredients.length > 0 ? (
+                <div className="border border-slate-100 rounded-2xl overflow-hidden text-xs">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-100 font-bold text-slate-400">
+                        <th className="p-3">Nama Bahan</th>
+                        <th className="p-3 text-right">Kebutuhan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
+                      {selectedTask.ingredients.map((ing, i) => (
+                        <tr key={i} className="hover:bg-slate-50/50">
+                          <td className="p-3">{ing.name}</td>
+                          <td className="p-3 text-right text-primary font-black">{ing.amount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic">Data bahan baku tidak tersedia.</p>
+              )}
+            </div>
+
+            <div className="pt-2">
+               <Button className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs" onClick={() => setDetailModalOpen(false)}>
                  Tutup Detail
                </Button>
             </div>
           </div>
         )}
-      </Modal>
-
-      {/* QA & Handover Modal */}
+      </Modal>      {/* QA & Handover Modal */}
       <Modal 
         isOpen={isQAModalOpen} 
         onClose={() => setQAModalOpen(false)} 
@@ -269,46 +465,190 @@ export const ChefQueue = ({ user }: { user: any }) => {
         className="max-w-3xl"
       >
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-3">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
                 <Thermometer className="w-3.5 h-3.5 text-red-500" />
                 Suhu Akhir (°C)
-              </label>
-              <input type="number" step="0.1" className="w-full border-2 border-slate-50 bg-slate-50 rounded-[24px] p-6 font-black text-3xl tracking-tighter focus:bg-white focus:border-primary transition-all outline-none" placeholder="75.0" />
+              </span>
+              <input type="number" step="0.1" className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all" placeholder="75.0" />
             </div>
-            <div className="space-y-3">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+            <div className="space-y-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
                 <MessageSquare className="w-3.5 h-3.5 text-primary" />
                 Catatan Kualitas
-              </label>
-              <textarea className="w-full border-2 border-slate-50 bg-slate-50 rounded-[24px] p-6 h-28 resize-none font-bold text-slate-700 focus:bg-white focus:border-primary transition-all outline-none" placeholder="Tambahkan catatan QC..." />
+              </span>
+              <textarea className="w-full bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none transition-all h-24 resize-none" placeholder="Tambahkan catatan QC..." />
             </div>
           </div>
 
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-               <h4 className="font-black text-slate-800 text-lg tracking-tight">Kalkulator Stok Balikan</h4>
-               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-md">Update Real-time</span>
+               <h4 className="font-extrabold text-slate-800 text-sm uppercase tracking-wider">Kalkulator Stok Balikan</h4>
+               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Update Real-time</span>
             </div>
             <div className="grid grid-cols-1 gap-4">
               {[
                 { name: 'Ayam Negri', unit: 'kg' },
                 { name: 'Minyak Goreng', unit: 'L' },
               ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between gap-6 p-6 bg-slate-50/50 border border-slate-50 rounded-[24px] group hover:bg-white hover:border-slate-100 transition-all">
-                  <span className="text-base font-black text-slate-700 tracking-tight">{item.name}</span>
+                <div key={i} className="flex items-center justify-between gap-6 p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:bg-white hover:border-primary/20 transition-all">
+                  <span className="text-sm font-bold text-slate-700">{item.name}</span>
                   <div className="flex items-center gap-4">
-                    <input type="text" className="w-28 text-right bg-white border border-slate-200 rounded-xl p-3 text-lg font-black tracking-tighter text-primary" placeholder="Sisa" />
-                    <span className="text-sm font-black text-slate-500 w-6 uppercase">{item.unit}</span>
+                    <input type="text" className="w-28 text-right bg-white border-2 border-slate-100 focus:border-primary rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none transition-all" placeholder="Sisa" />
+                    <span className="text-xs font-bold text-slate-500 w-6 uppercase">{item.unit}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <Button className="w-full py-6 text-lg" variant="primary" onClick={submitQA}>
+          <Button className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs" onClick={submitQA}>
             {selectedTask?.status === 'Ready' ? 'Buat ID & QR Serah Terima' : 'Konfirmasi Selesai Masak'}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Stock Verification Modal */}
+      <Modal
+        isOpen={isVerificationModalOpen}
+        onClose={() => setVerificationModalOpen(false)}
+        title="Verifikasi Awal Stok Dapur"
+        className="max-w-3xl"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-primary-light border border-primary/20 rounded-2xl">
+            <span className="text-[10px] font-black text-primary uppercase tracking-widest block mb-1">
+              Pengecekan Stok Wajib
+            </span>
+            <p className="text-slate-500 text-xs font-bold leading-relaxed">
+              Sebelum memproses antrean masak hari ini, harap verifikasi stok fisik bahan baku Anda. Ini menyelaraskan stok dapur dengan sistem.
+            </p>
+          </div>
+
+          <div className="space-y-8 pr-1">
+            {verificationData?.lastMenu && (
+              <div className="space-y-4">
+                <div className="border-l-4 border-primary pl-3">
+                  <h4 className="text-base font-extrabold text-slate-800 tracking-tight">
+                    Bahan Baku Menu Kemarin ({verificationData.lastMenu})
+                  </h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                    Harap cek wadah dan sisa eceran secara mendetail
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {verificationData.detailedIngredients.map((ing) => (
+                    <div key={ing.batchId} className="p-5 bg-slate-50 border border-slate-100 rounded-2xl space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-black text-slate-800 text-sm tracking-tight leading-none">
+                            {ing.materialName}
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                            ID: {ing.batchId} • {ing.container} {ing.package_capacity ? `(@ ${ing.package_capacity} ${ing.package_unit})` : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                            Kemasan Utuh ({ing.container})
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={detailedInputs[ing.batchId]?.qty_packed || "0"}
+                            onChange={(e) => setDetailedInputs({
+                              ...detailedInputs,
+                              [ing.batchId]: {
+                                ...detailedInputs[ing.batchId],
+                                qty_packed: e.target.value
+                              }
+                            })}
+                            className="w-full bg-white border-2 border-slate-100 focus:border-primary rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                            Sisa Eceran ({ing.package_unit || ing.unit || 'kg'})
+                          </span>
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            value={detailedInputs[ing.batchId]?.qty_loose || "0"}
+                            onChange={(e) => setDetailedInputs({
+                              ...detailedInputs,
+                              [ing.batchId]: {
+                                ...detailedInputs[ing.batchId],
+                                qty_loose: e.target.value
+                              }
+                            })}
+                            className="w-full bg-white border-2 border-slate-100 focus:border-primary rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none transition-all"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {verificationData?.otherIngredients && verificationData.otherIngredients.length > 0 && (
+              <div className="space-y-4">
+                <div className="border-l-4 border-slate-400 pl-3">
+                  <h4 className="text-base font-extrabold text-slate-800 tracking-tight">
+                    Bahan Baku Lainnya (Pengecekan Cepat)
+                  </h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                    Masukkan total berat/volume riil yang bersisa
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {verificationData.otherIngredients.map((ing) => (
+                    <div key={ing.batchId} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                      <div>
+                        <p className="font-bold text-slate-700 tracking-tight text-sm">
+                          {ing.materialName}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">
+                          {ing.container} {ing.package_capacity ? `(@ ${ing.package_capacity} ${ing.package_unit})` : ''}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={otherInputs[ing.batchId] || "0"}
+                          onChange={(e) => setOtherInputs({
+                            ...otherInputs,
+                            [ing.batchId]: e.target.value
+                          })}
+                          className="w-32 text-right bg-white border-2 border-slate-100 focus:border-primary rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none transition-all"
+                        />
+                        <span className="text-xs font-bold text-slate-500 w-8 uppercase">
+                          {ing.package_unit || ing.unit || 'kg'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Button 
+            className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs" 
+            onClick={submitVerification}
+            disabled={isVerifying}
+          >
+            {isVerifying ? "Menyimpan Verifikasi..." : "Konfirmasi & Mulai Masak"}
           </Button>
         </div>
       </Modal>

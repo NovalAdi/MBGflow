@@ -13,6 +13,7 @@ import { KitchenList } from "./pages/admin/KitchenList";
 import { KitchenDetail } from "./pages/admin/KitchenDetail";
 import { WastageReport } from "./pages/admin/WastageReport";
 import { RequestStock } from "./pages/admin/RequestStock";
+import { DailyRecap } from "./pages/admin/DailyRecap";
 import { ChefQueue } from "./pages/chef/Queue";
 import { ChefStock } from "./pages/chef/Stock";
 import { ChefDashboard } from "./pages/chef/Dashboard";
@@ -74,6 +75,7 @@ const AppContent = () => {
             <Route path="/admin/kitchens/:id?" element={<KitchenDetail />} />
             <Route path="/admin/reports" element={<WastageReport />} />
             <Route path="/admin/request-stock" element={<RequestStock />} />
+            <Route path="/admin/daily-recap" element={<DailyRecap />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </>
         )}

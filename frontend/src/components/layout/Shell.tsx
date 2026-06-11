@@ -18,6 +18,7 @@ const sidebarItems: SidebarItem[] = [
   { icon: Wrench, label: "Manajemen Dapur", path: "/admin/kitchens", roles: ['Admin'] },
   { icon: PackageSearch, label: "Permintaan Bahan", path: "/admin/request-stock", roles: ['Admin'] },
   { icon: ClipboardList, label: "Laporan Wastage", path: "/admin/reports", roles: ['Admin'] },
+  { icon: ClipboardList, label: "Rekap Harian", path: "/admin/daily-recap", roles: ['Admin'] },
   { icon: LayoutDashboard, label: "Dashboard Chef", path: "/chef/dashboard", roles: ['Chef'] },
   { icon: ClipboardList, label: "Antrean Masak", path: "/chef/queue", roles: ['Chef'] },
   { icon: PackageSearch, label: "Stok Dapur", path: "/chef/stock", roles: ['Chef'] },
@@ -142,7 +143,7 @@ export const Shell = ({ children, user, onLogout }: { children: React.ReactNode,
           <div className="pt-4">
             <Button 
               variant="ghost" 
-              className="w-full py-6 rounded-[24px] text-red-500 hover:bg-red-50 hover:text-red-600 font-black uppercase tracking-widest text-xs border border-transparent hover:border-red-100 transition-all"
+              className="w-full py-3.5 rounded-2xl text-red-500 hover:bg-red-50 hover:text-red-600 font-black uppercase tracking-widest text-xs border border-transparent hover:border-red-100 transition-all"
               onClick={() => {
                 setIsProfileModalOpen(false);
                 onLogout();

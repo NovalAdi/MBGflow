@@ -51,6 +51,7 @@ async function resetDatabase() {
     await connection.query('SET FOREIGN_KEY_CHECKS = 0;');
     const tables = [
       'notifications',
+      'stock_verifications',
       'wastage_records',
       'stock_requests',
       'production_logs',
@@ -236,6 +237,18 @@ async function createTables() {
       );
     `);
 
+    // Stock verifications table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS stock_verifications (
+        id VARCHAR(50) PRIMARY KEY,
+        kitchenId VARCHAR(50) NOT NULL,
+        verifiedAt VARCHAR(100) NOT NULL,
+        verifiedBy VARCHAR(255) NOT NULL,
+        details TEXT NOT NULL,
+        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE
+      );
+    `);
+
     console.log('Database tables created successfully.');
   } catch (error) {
     console.error('Error creating database tables:', error);
@@ -342,7 +355,6 @@ async function seedDatabase() {
         id: 'mat-1', name: 'Ayam Negri', logistics_sku: 'SKU-AYM-01', base_unit: 'kg', has_packaging: 1, packaging_name: 'Karton', packaging_capacity: 25,
         batches: [
           { id: 'b1', kitchenId: 'k1', container: 'Karton', qty_packed: 6, qty_loose: 0.0, unit: 'karton', weight: '6 karton', expiry: '2025-08-10', package_capacity: 25, package_unit: 'kg' },
-          { id: 'b2', kitchenId: 'k1', container: 'Box', qty_packed: 10, qty_loose: 0.0, unit: 'box', weight: '10 box', expiry: '2025-08-12', package_capacity: 20, package_unit: 'kg' },
           { id: 'b2a', kitchenId: 'k2', container: 'Karton', qty_packed: 8, qty_loose: 0.0, unit: 'karton', weight: '8 karton', expiry: '2025-08-15', package_capacity: 25, package_unit: 'kg' },
           { id: 'b2b', kitchenId: 'k3', container: 'Karton', qty_packed: 5, qty_loose: 0.0, unit: 'karton', weight: '5 karton', expiry: '2025-07-20', package_capacity: 25, package_unit: 'kg' },
         ],
@@ -488,9 +500,12 @@ async function seedDatabase() {
         ? 'Tangerang'
         : 'Bandung';
       const logStatus = plan.status === 'NotStarted' ? 'Pending' : plan.status;
-      const startTime = (plan.status === 'Cooking' || plan.status === 'Ready')
-        ? new Date().toISOString()
-        : null;
+      let startTime = null;
+      if (plan.status === 'Cooking') {
+        startTime = new Date().toISOString();
+      } else if (plan.status === 'Ready') {
+        startTime = new Date(Date.now() - 86400000).toISOString();
+      }
 
       await connection.query(
         'INSERT INTO production_logs (id, kitchenId, kitchen, menu, servings, city, startTime, qaNotes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -559,6 +574,40 @@ async function seedDatabase() {
       );
     }
     console.log(`  ✓ ${notifications.length} notifications seeded`);
+
+    // =========================================================================
+    // 9. STOCK VERIFICATIONS
+    // =========================================================================
+    const stockVerifications = [
+      {
+        id: 'v-1001',
+        kitchenId: 'k1',
+        verifiedAt: new Date(Date.now() - 86400000).toISOString(),
+        verifiedBy: 'Chef Andi Jakarta',
+        details: JSON.stringify([
+          { batchId: 'b1', qty_packed: 5, qty_loose: 12.5 },
+          { batchId: 'b3', qty_packed: 4, qty_loose: 8.0 }
+        ])
+      },
+      {
+        id: 'v-1002',
+        kitchenId: 'k2',
+        verifiedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+        verifiedBy: 'Chef Budi Tangerang',
+        details: JSON.stringify([
+          { batchId: 'b2a', qty_packed: 7, qty_loose: 5.0 },
+          { batchId: 'b4', qty_packed: 3, qty_loose: 15.0 },
+          { batchId: 'b9', qty_packed: 10, qty_loose: 2.0 }
+        ])
+      }
+    ];
+    for (const sv of stockVerifications) {
+      await connection.query(
+        'INSERT INTO stock_verifications (id, kitchenId, verifiedAt, verifiedBy, details) VALUES (?, ?, ?, ?, ?)',
+        [sv.id, sv.kitchenId, sv.verifiedAt, sv.verifiedBy, sv.details]
+      );
+    }
+    console.log(`  ✓ ${stockVerifications.length} stock verifications seeded`);
 
     // =========================================================================
     await connection.query('SET FOREIGN_KEY_CHECKS = 1;');

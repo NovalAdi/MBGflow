@@ -735,21 +735,21 @@ export const ProductionPlanning = () => {
       >
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
           <div className="lg:col-span-3 space-y-8">
-            <div className="p-8 bg-slate-50/50 rounded-[32px] space-y-8 border border-slate-50">
-              <div className="space-y-3">
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Pilih Menu</label>
+            <div className="p-6 bg-slate-50 rounded-2xl space-y-6 border border-slate-100">
+              <div className="space-y-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Pilih Menu</span>
                 <select 
-                  className="w-full border-2 border-transparent bg-white rounded-2xl p-5 text-base font-black text-slate-800 outline-none focus:border-primary transition-all shadow-sm"
+                  className="w-full bg-white border-2 border-slate-100 focus:border-primary rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none transition-all cursor-pointer"
                   value={formData.menu}
                   onChange={(e) => setFormData(prev => ({ ...prev, menu: e.target.value }))}
                 >
                   {menus.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
                 </select>
               </div>
-              <div className="space-y-3">
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Pilih Dapur</label>
+              <div className="space-y-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Pilih Dapur</span>
                 <select 
-                  className="w-full border-2 border-transparent bg-white rounded-2xl p-5 text-base font-black text-slate-800 outline-none focus:border-primary transition-all shadow-sm"
+                  className="w-full bg-white border-2 border-slate-100 focus:border-primary rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none transition-all cursor-pointer"
                   value={formData.kitchenId}
                   onChange={(e) => setFormData(prev => ({ ...prev, kitchenId: e.target.value }))}
                 >
@@ -757,25 +757,25 @@ export const ProductionPlanning = () => {
                 </select>
                 {formData.kitchenId && (
                   <p className="text-[10px] font-bold text-slate-400 mt-1 px-1">
-                    Kapasitas Dapur: <span className="text-slate-600">{selectedKitchenCapacity} porsi</span> | Sudah Terencana: <span className="text-slate-600">{otherPlansPortionsForDay} porsi</span>
+                    Kapasitas Dapur: <span className="text-slate-655">{selectedKitchenCapacity} porsi</span> | Sudah Terencana: <span className="text-slate-655">{otherPlansPortionsForDay} porsi</span>
                   </p>
                 )}
               </div>
-              <div className="space-y-3">
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Target Jumlah Porsi</label>
+              <div className="space-y-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Target Jumlah Porsi</span>
                 <div className="relative group">
                   <input 
                     type="number" 
                     value={formData.portions || ""}
                     onChange={(e) => setFormData(prev => ({ ...prev, portions: Number(e.target.value) }))}
                     placeholder="Masukkan jumlah porsi..."
-                    className="w-full border-2 border-transparent bg-white rounded-2xl p-5 font-black text-2xl tracking-tighter text-slate-800 outline-none focus:border-primary transition-all shadow-sm"
+                    className="w-full bg-white border-2 border-slate-100 focus:border-primary rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none transition-all pr-16"
                   />
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 font-black text-[10px] uppercase tracking-widest">Porsi</div>
+                  <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs uppercase tracking-wider">Porsi</div>
                 </div>
                 {isFormOverCapacity && (
-                  <div className="p-5 bg-amber-500 rounded-[24px] flex gap-4 items-start shadow-xl shadow-amber-500/20 text-white animate-pulse mt-3">
-                    <AlertTriangle className="w-6 h-6 shrink-0 mt-0.5" />
+                  <div className="p-4 bg-amber-500 rounded-2xl flex gap-4 items-start shadow-xl shadow-amber-500/20 text-white animate-pulse mt-3">
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-xs font-black uppercase tracking-widest text-white">Kapasitas Terlampaui</p>
                       <p className="text-[11px] leading-relaxed text-white/90 font-bold mt-1.5">
@@ -785,13 +785,13 @@ export const ProductionPlanning = () => {
                   </div>
                 )}
               </div>
-              <div className="space-y-3">
-                <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Catatan Tambahan</label>
+              <div className="space-y-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Catatan Tambahan</span>
                 <textarea 
                   value={formData.note}
                   onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
                   placeholder="Contoh: Pisahkan sambal, kurangi garam, dll..."
-                  className="w-full border-2 border-transparent bg-white rounded-2xl p-5 font-medium text-sm text-slate-700 outline-none focus:border-primary transition-all shadow-sm min-h-[120px] resize-none"
+                  className="w-full bg-white border-2 border-slate-100 focus:border-primary rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none transition-all h-24 resize-none"
                 />
               </div>
             </div>
@@ -799,7 +799,7 @@ export const ProductionPlanning = () => {
 
           <div className="lg:col-span-2 space-y-8">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary-light flex items-center justify-center text-primary">
+              <div className="w-8 h-8 rounded-lg bg-primary-light/10 text-primary flex items-center justify-center">
                  <Calculator className="w-4 h-4" />
               </div>
               <h4 className="font-black text-xs text-slate-800 uppercase tracking-widest">Cek Bahan Langsung</h4>
@@ -810,8 +810,8 @@ export const ProductionPlanning = () => {
                 <div 
                   key={i} 
                   className={cn(
-                    "p-5 rounded-[24px] transition-all border-2",
-                    mat.isLow ? "bg-red-50/50 border-red-100" : "bg-white border-transparent"
+                    "p-4 rounded-2xl transition-all border",
+                    mat.isLow ? "bg-red-50 border-red-100" : "bg-slate-50 border-slate-100"
                   )}
                 >
                   <div className="flex items-center justify-between mb-4">
@@ -823,21 +823,21 @@ export const ProductionPlanning = () => {
                   </div>
                   <div className="flex items-end justify-between">
                     <div>
-                      <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1.5 opacity-60">Dibutuhkan</p>
-                      <p className="font-black text-primary text-base tracking-tighter leading-none">{mat.needed} {mat.unit}</p>
+                      <span className="text-[9px] font-black text-slate-455 uppercase tracking-widest block mb-1">Dibutuhkan</span>
+                      <span className="text-sm font-extrabold text-primary">{mat.needed} {mat.unit}</span>
                     </div>
                     <div className="text-right">
-                      <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1.5 opacity-60">Tersedia</p>
-                      <p className="font-black text-slate-300 text-base tracking-tighter leading-none">{mat.available} {mat.unit}</p>
+                      <span className="text-[9px] font-black text-slate-455 uppercase tracking-widest block mb-1">Tersedia</span>
+                      <span className="text-sm font-extrabold text-slate-800">{mat.available} {mat.unit}</span>
                     </div>
                   </div>
                 </div>
               ))}
 
               {!formData.portions && (
-                <div className="p-10 text-center bg-slate-50/50 rounded-[32px] border-2 border-dashed border-slate-100">
-                  <Info className="w-10 h-10 text-slate-200 mx-auto mb-4" />
-                  <p className="text-[11px] font-black text-slate-300 uppercase tracking-widest leading-relaxed">
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                  <Info className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">
                     Masukkan porsi untuk<br/>menghitung bahan
                   </p>
                 </div>
@@ -845,8 +845,8 @@ export const ProductionPlanning = () => {
             </div>
 
             {hasShortage && (
-              <div className="p-5 bg-red-500 rounded-[24px] flex gap-4 items-start shadow-xl shadow-red-500/20">
-                <AlertTriangle className="w-6 h-6 text-white shrink-0 mt-0.5" />
+              <div className="p-4 bg-red-500 rounded-2xl flex gap-4 items-start shadow-xl shadow-red-500/20">
+                <AlertTriangle className="w-5 h-5 text-white shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs font-black text-white uppercase tracking-widest">Stok Kurang</p>
                   <p className="text-[11px] leading-relaxed text-white/80 font-bold mt-1.5">
@@ -857,15 +857,15 @@ export const ProductionPlanning = () => {
             )}
           </div>
 
-          <div className="lg:col-span-5 pt-8 border-t border-slate-100 flex flex-wrap gap-4">
+          <div className="lg:col-span-5 pt-6 border-t border-slate-100 flex flex-wrap gap-3">
             {isEditMode && (
               <Button 
                 type="button"
                 variant="danger"
-                className="flex-1 min-w-[150px] py-5 rounded-[24px] font-black uppercase tracking-[0.15em] text-sm shadow-xl transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer"
+                className="flex-1 min-w-[150px] py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer"
                 onClick={() => handleDeletePlan(formData.id)}
               >
-                <Trash2 className="w-5 h-5 mr-3" />
+                <Trash2 className="w-4 h-4 mr-2" />
                 Hapus Rencana
               </Button>
             )}
@@ -873,24 +873,24 @@ export const ProductionPlanning = () => {
               <Button 
                 type="button"
                 variant="outline"
-                className="flex-1 min-w-[200px] py-5 rounded-[24px] font-black uppercase tracking-[0.15em] text-sm shadow-md transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer border-2 border-amber-500 hover:bg-amber-50 text-amber-700"
+                className="flex-1 min-w-[200px] py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer border border-amber-500 hover:bg-amber-50 text-amber-700"
                 onClick={handleSendShortageNotification}
               >
-                <Send className="w-5 h-5 mr-3" />
+                <Send className="w-4 h-4 mr-2" />
                 Kirim Notif Dapur
               </Button>
             )}
             <Button 
               type="button"
               className={cn(
-                "flex-1 min-w-[180px] py-5 rounded-[24px] font-black uppercase tracking-[0.15em] text-sm shadow-xl transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer",
+                "flex-1 min-w-[180px] py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer",
                 hasShortage 
                   ? "bg-red-500 hover:bg-red-650 text-white shadow-red-500/20" 
-                  : "bg-[#15803D] hover:bg-[#166534] text-white shadow-[#15803D]/20"
+                  : ""
               )} 
               onClick={handleSavePlan}
             >
-              <Check className="w-5 h-5 mr-3" />
+              <Check className="w-4 h-4 mr-2" />
               {isEditMode ? "Simpan Perubahan" : "Simpan Rencana"}
             </Button>
           </div>

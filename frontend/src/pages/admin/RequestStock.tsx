@@ -352,37 +352,37 @@ export const RequestStock = () => {
       >
         <div className="space-y-6">
           <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-mono">Total Permintaan Masal</span>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Total Permintaan Masal</span>
             <p className="text-slate-800 font-extrabold text-sm mt-0.5">
               Tindakan ini akan memproses <span className="text-primary font-black">{bulkRequests.length}</span> permintaan logistik sekaligus untuk <span className="font-extrabold">{bulkKitchenName}</span>.
             </p>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-450 uppercase tracking-widest px-1 font-mono">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">
               Catatan / Feedback Masal (Wajib)
             </label>
             <textarea
               rows={4}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none resize-none"
+              className="w-full bg-slate-50 border-2 border-transparent rounded-2xl p-4 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all resize-none"
               placeholder="Tulis catatan feedback masal yang akan diterapkan untuk seluruh tiket ini..."
               value={bulkNote}
               onChange={(e) => setBulkNote(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Button
               onClick={() => setBulkModalOpen(false)}
-              variant="secondary"
-              className="flex-1 bg-white border border-slate-250 hover:bg-slate-50 text-slate-700 font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl cursor-pointer"
+              variant="ghost"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs text-slate-400 hover:bg-slate-50 cursor-pointer"
             >
               Batal
             </Button>
             <Button
               onClick={handleConfirmBulkAction}
               disabled={!bulkNote.trim()}
-              className="flex-1 bg-primary hover:bg-primary-dark text-white font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl cursor-pointer disabled:opacity-50"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs cursor-pointer disabled:opacity-50"
             >
               Konfirmasi
             </Button>
@@ -400,23 +400,23 @@ export const RequestStock = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-bold text-slate-700">
               <div>
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Dapur Peminta</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Dapur Peminta</span>
                 <span className="text-slate-800 font-extrabold">{selectedRequest.kitchenName}</span>
               </div>
               <div>
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Tujuan / Supplier</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Tujuan / Supplier</span>
                 <span className="text-slate-800 font-extrabold">{selectedRequest.supplierKitchenName || "Gudang Pusat"}</span>
               </div>
               <div className="mt-2">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Bahan Baku</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Bahan Baku</span>
                 <span className="text-primary font-black">{selectedRequest.material}</span>
               </div>
               <div className="mt-2">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Jumlah</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Jumlah</span>
                 <span className="text-slate-900 font-black">{selectedRequest.amount}</span>
               </div>
               <div className="mt-2">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Urgensi</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Urgensi</span>
                 <div>
                   <span className={cn(
                     "px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider inline-block",
@@ -431,7 +431,7 @@ export const RequestStock = () => {
                 </div>
               </div>
               <div className="mt-2">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Status</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Status</span>
                 <div>
                   <span className={cn(
                     "px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider inline-block border",
@@ -456,7 +456,7 @@ export const RequestStock = () => {
             </div>
 
             <div className="bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-bold text-slate-700">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Tanggal Pengajuan</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Tanggal Pengajuan</span>
               <span className="text-slate-800">
                 {new Date(selectedRequest.createdAt).toLocaleDateString("id-ID", {
                   weekday: "long",
@@ -476,12 +476,12 @@ export const RequestStock = () => {
             {selectedRequest.status === "Pending" ? (
               <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-455 uppercase tracking-widest px-1 font-mono">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">
                     Catatan / Feedback Admin
                   </label>
                   <textarea
                     rows={3}
-                    className="w-full bg-slate-55 border border-slate-200 rounded-2xl p-4 text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-primary/20 outline-none resize-none"
+                    className="w-full bg-slate-50 border-2 border-transparent rounded-2xl p-4 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all resize-none"
                     placeholder="Tulis catatan (opsional untuk disetujui, wajib untuk tunda/tolak)..."
                     value={adminNote}
                     onChange={(e) => setAdminNote(e.target.value)}
@@ -492,21 +492,21 @@ export const RequestStock = () => {
                   <Button
                     onClick={() => handleProcessRequest("Approved")}
                     disabled={updatingId !== null}
-                    className="flex-1 bg-primary hover:bg-primary-dark text-white font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl cursor-pointer"
+                    className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs cursor-pointer"
                   >
                     Approve
                   </Button>
                   <Button
                     onClick={() => handleProcessRequest("Pending")}
                     disabled={updatingId !== null || !adminNote}
-                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl cursor-pointer disabled:opacity-50"
+                    className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs bg-amber-500 hover:bg-amber-600 text-white cursor-pointer disabled:opacity-50"
                   >
                     Hold
                   </Button>
                   <Button
                     onClick={() => handleProcessRequest("Denied")}
                     disabled={updatingId !== null || !adminNote}
-                    className="flex-1 bg-red-500 hover:bg-red-650 text-white font-black text-[10px] uppercase tracking-widest py-3.5 rounded-xl cursor-pointer disabled:opacity-50"
+                    className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs bg-red-500 hover:bg-red-650 text-white cursor-pointer disabled:opacity-50"
                   >
                     Deny
                   </Button>
@@ -520,7 +520,7 @@ export const RequestStock = () => {
             ) : (
               <div className="space-y-4 pt-2 border-t border-slate-100">
                 <div className="bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-medium">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 font-mono">Catatan Admin / Feedback:</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Catatan Admin / Feedback:</span>
                   {selectedRequest.adminNotes ? (
                     <p className="text-slate-700 font-bold leading-relaxed">{selectedRequest.adminNotes}</p>
                   ) : (

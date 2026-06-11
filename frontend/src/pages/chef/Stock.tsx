@@ -97,6 +97,7 @@ export const ChefStock = ({ user }: { user: any }) => {
         isOpen={isWastageModalOpen} 
         onClose={() => setWastageModalOpen(false)} 
         title="Laporan Kerugian (Wastage)"
+        className="max-w-2xl"
       >
         <div className="space-y-6">
           <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex gap-4">
@@ -104,9 +105,11 @@ export const ChefStock = ({ user }: { user: any }) => {
                <AlertCircle className="w-6 h-6" />
             </div>
              <div>
-                <h4 className="font-bold text-red-800">{selectedBatch?.material}</h4>
-                <p className="text-xs text-red-700 font-medium">
-                  ID Batch: {selectedBatch?.id} • {selectedBatch?.package_capacity ? `${selectedBatch.container} (${selectedBatch.package_capacity} ${selectedBatch.package_unit})` : selectedBatch?.container}
+                <h4 className="font-extrabold text-red-800 text-xl tracking-tight">{selectedBatch?.material}</h4>
+                <p className="text-[10px] text-red-700 font-bold uppercase tracking-widest mt-1">
+                  ID Batch: {selectedBatch?.id} • {selectedBatch?.package_capacity 
+                    ? `${selectedBatch.qty_packed > 0 ? `${selectedBatch.qty_packed} ` : ''}${selectedBatch.container} (@ ${selectedBatch.package_capacity} ${selectedBatch.package_unit})${selectedBatch.qty_loose > 0 ? ` + ${selectedBatch.qty_loose} ${selectedBatch.package_unit}` : ''}` 
+                    : selectedBatch?.container}
                 </p>
              </div>
           </div>
@@ -114,7 +117,7 @@ export const ChefStock = ({ user }: { user: any }) => {
           <form className="space-y-4" onSubmit={handleWastageSubmit}>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
                   Jumlah Dibuang ({selectedBatch?.package_unit || selectedBatch?.unit || 'kg'})
                 </label>
                 <input 
@@ -123,16 +126,16 @@ export const ChefStock = ({ user }: { user: any }) => {
                   required
                   value={wastageWeight}
                   onChange={(e) => setWastageWeight(e.target.value)}
-                  className="w-full border-2 border-slate-100 rounded-xl p-4 font-bold" 
+                  className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all" 
                   placeholder="0.0" 
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Alasan</label>
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Alasan</label>
                 <select 
                   value={wastageReason}
                   onChange={(e) => setWastageReason(e.target.value)}
-                  className="w-full border-2 border-slate-100 rounded-xl p-4 font-medium text-sm"
+                  className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all"
                 >
                   <option value="Busuk">Busuk</option>
                   <option value="Kedaluwarsa">Kedaluwarsa</option>
@@ -142,15 +145,15 @@ export const ChefStock = ({ user }: { user: any }) => {
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500 uppercase">Catatan Tambahan</label>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Catatan Tambahan</label>
               <textarea 
                 value={wastageNotes}
                 onChange={(e) => setWastageNotes(e.target.value)}
-                className="w-full border-2 border-slate-100 rounded-xl p-4 h-24 resize-none" 
+                className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all h-24 resize-none" 
                 placeholder="Ceritakan detail kronologi..." 
               />
             </div>
-            <Button className="w-full py-6 mt-4 text-lg" variant="danger" type="submit">
+            <Button className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs mt-4" variant="danger" type="submit">
               Submit Laporan Kerugian
             </Button>
           </form>
@@ -212,7 +215,9 @@ const StockRow = ({ material, onReportWastage }: { material: any, onReportWastag
                       </div>
                       <div>
                         <p className="font-black text-slate-800 tracking-tight text-base leading-none">
-                          {batch.package_capacity ? `${batch.container} (${batch.package_capacity} ${batch.package_unit})` : batch.container}
+                          {batch.package_capacity 
+                            ? `${batch.qty_packed > 0 ? `${batch.qty_packed} ` : ''}${batch.container} (@ ${batch.package_capacity} ${batch.package_unit})${batch.qty_loose > 0 ? ` + ${batch.qty_loose} ${batch.package_unit}` : ''}`
+                            : batch.container}
                         </p>
                         <p className="text-[9px] text-slate-550 font-bold uppercase tracking-[0.2em] flex items-center gap-1 mt-1.5">
                           <Hash className="w-2.5 h-2.5 text-slate-450" />

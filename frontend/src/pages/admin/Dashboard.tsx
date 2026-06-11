@@ -207,58 +207,56 @@ export const AdminDashboard = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         title="Detail Aktivitas Memasak"
+        className="max-w-2xl"
       >
         {selectedActivity && (
-          <div className="space-y-6">
-            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-              <h4 className="text-3xl font-black text-slate-800 tracking-tighter mb-4">{selectedActivity.menu}</h4>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <UtensilsCrossed className="w-3 h-3" />
-                    Nama Dapur
-                  </p>
-                  <p className="font-bold text-slate-700">{selectedActivity.kitchen}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <MapPin className="w-3 h-3" />
-                    Kota
-                  </p>
-                  <p className="font-bold text-slate-700">{selectedActivity.city}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Hash className="w-3 h-3" />
-                    Jumlah Porsi
-                  </p>
-                  <p className="font-bold text-slate-700">{selectedActivity.servings} Porsi</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <User className="w-3 h-3" />
-                    Chef Penanggung Jawab
-                  </p>
-                  <p className="font-bold text-slate-700">{selectedActivity.chefPenanggungJawab || '-'}</p>
-                </div>
+          <div className="space-y-6 py-2">
+            <div>
+              <h4 className="text-xl font-extrabold text-slate-800 tracking-tight">
+                {selectedActivity.menu}
+              </h4>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                Dapur: {selectedActivity.kitchen}
+              </p>
+            </div>
+
+            {/* Quick stats */}
+            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Nama Dapur</span>
+                <span className="text-sm font-extrabold text-slate-800">{selectedActivity.kitchen}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Kota</span>
+                <span className="text-sm font-extrabold text-slate-800">{selectedActivity.city}</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Jumlah Porsi</span>
+                <span className="text-sm font-extrabold text-slate-800">{selectedActivity.servings} Porsi</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Chef Penanggung Jawab</span>
+                <span className="text-sm font-extrabold text-slate-800">{selectedActivity.chefPenanggungJawab || '-'}</span>
               </div>
             </div>
 
             {selectedActivity.status === 'Ready' && selectedActivity.qaNotes && (
-              <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-2">
-                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
-                  <ClipboardList className="w-3 h-3" />
-                  Catatan QA
-                </p>
+              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-2">
+                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block">Catatan QA</span>
                 <p className="text-sm text-indigo-900 font-medium leading-relaxed italic">
                   "{selectedActivity.qaNotes}"
                 </p>
               </div>
             )}
 
-            <Button className="w-full py-4 text-lg" variant="secondary" onClick={() => setIsModalOpen(false)}>
-              Tutup
-            </Button>
+            <div className="pt-2">
+              <Button 
+                onClick={() => setIsModalOpen(false)} 
+                className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs"
+              >
+                Tutup Laporan
+              </Button>
+            </div>
           </div>
         )}
       </Modal>

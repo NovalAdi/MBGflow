@@ -654,38 +654,28 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="relative overflow-hidden bg-slate-900 rounded-[32px] text-white p-8 md:p-10 shadow-xl shadow-slate-900/10">
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-br from-primary/30 to-emerald-500/10 rounded-full blur-[80px] -mr-32 -mt-32 pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-[0.25em]">
-              <Sparkles className="w-4 h-4 animate-pulse" />
-              <span>Prediksi Kebutuhan & Logistik Dapur</span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-none">
-              Pengajuan Restock Bahan Mandiri
-            </h1>
-            <p className="text-slate-400 font-medium text-sm md:text-base max-w-2xl">
-              Dapur Anda: <span className="text-primary font-bold">{kitchenDetail?.name}</span> ({kitchenDetail?.city}) • Lokasi: {kitchenDetail?.latitude || "-"}, {kitchenDetail?.longitude || "-"}
-            </p>
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Pengajuan Restock Bahan</h1>
+          <p className="text-slate-600 font-bold text-[11px] uppercase tracking-widest mt-2 px-1">
+            {kitchenDetail?.name} • {kitchenDetail?.city} • Prediksi Kebutuhan & Logistik Dapur
+          </p>
+        </div>
+        <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-3 rounded-2xl shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-primary-light text-primary flex items-center justify-center shrink-0">
+            <Sliders className="w-5 h-5" />
           </div>
-          
-          <div className="flex items-center gap-4 bg-slate-800/80 backdrop-blur border border-slate-700/50 p-4 rounded-2xl shrink-0 self-start md:self-auto">
-            <div className="w-10 h-10 rounded-xl bg-primary-light/10 text-primary flex items-center justify-center shadow-inner shrink-0">
-              <Sliders className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Batas Jarak Dapur Sekitar</p>
-              <div className="flex items-center gap-2 mt-1">
-                <input 
-                  type="number"
-                  value={maxDistance}
-                  onChange={(e) => setMaxDistance(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-14 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs text-white text-center font-bold"
-                />
-                <span className="text-xs font-bold text-white">km</span>
-              </div>
+          <div>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Batas Jarak Dapur</p>
+            <div className="flex items-center gap-2 mt-1">
+              <input 
+                type="number"
+                value={maxDistance}
+                onChange={(e) => setMaxDistance(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-14 bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-xs text-slate-800 text-center font-bold focus:border-primary outline-none transition-all"
+              />
+              <span className="text-xs font-bold text-slate-600">km</span>
             </div>
           </div>
         </div>
@@ -1217,23 +1207,23 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-bold text-slate-700">
                 <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Dapur Peminta</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Dapur Peminta</span>
                   <span className="text-slate-800 font-extrabold">{selectedTrackingRequest.kitchenName || kitchenDetail?.name}</span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Tujuan / Supplier</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Tujuan / Supplier</span>
                   <span className="text-slate-800 font-extrabold">{selectedTrackingRequest.supplierKitchenName || "Gudang Pusat"}</span>
                 </div>
                 <div className="mt-2">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Bahan Baku</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Bahan Baku</span>
                   <span className="text-primary font-black">{selectedTrackingRequest.material}</span>
                 </div>
                 <div className="mt-2">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Jumlah</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Jumlah</span>
                   <span className="text-slate-900 font-black">{selectedTrackingRequest.amount}</span>
                 </div>
                 <div className="mt-2">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Urgensi</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Urgensi</span>
                   <div>
                     <span className={cn(
                       "px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider inline-block",
@@ -1248,7 +1238,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
                   </div>
                 </div>
                 <div className="mt-2">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Status</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Status</span>
                   <div>
                     <span className={cn(
                       "px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider inline-block border",
@@ -1273,7 +1263,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
               </div>
 
               <div className="bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-bold text-slate-700">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Tanggal Pengajuan</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Tanggal Pengajuan</span>
                 <span className="text-slate-800">
                   {new Date(selectedTrackingRequest.createdAt).toLocaleDateString("id-ID", {
                     weekday: "long",
@@ -1291,7 +1281,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
               </div>
 
               <div className="bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-medium">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 font-mono">Catatan Admin / Feedback:</span>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Catatan Admin / Feedback:</span>
                 {selectedTrackingRequest.adminNotes ? (
                   <p className="text-slate-700 font-bold leading-relaxed">{selectedTrackingRequest.adminNotes}</p>
                 ) : (
@@ -1306,7 +1296,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
                     setTrackingDetailOpen(false);
                     setSelectedTrackingRequest(null);
                   }}
-                  className="w-full py-3.5 font-black uppercase text-[10px] tracking-widest bg-slate-800 hover:bg-slate-900 text-white rounded-xl shadow-md cursor-pointer"
+                  className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs"
                 >
                   Tutup
                 </Button>

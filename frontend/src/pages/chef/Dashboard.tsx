@@ -32,6 +32,7 @@ export const ChefDashboard = ({ user }: { user: any }) => {
   const [data, setData] = React.useState<any>(null);
   const [inventoryItems, setInventoryItems] = React.useState<any[]>([]);
   const [notifications, setNotifications] = React.useState<any[]>([]);
+  const [isVerified, setIsVerified] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   
@@ -49,14 +50,16 @@ export const ChefDashboard = ({ user }: { user: any }) => {
     }
 
     try {
-      const [dashData, invData, notifData] = await Promise.all([
+      const [dashData, invData, notifData, verificationStatus] = await Promise.all([
         api.getChefDashboardData(user.kitchenId),
         api.getInventory(),
-        api.getNotifications(user.kitchenId)
+        api.getNotifications(user.kitchenId),
+        api.checkStockVerificationStatus(user.kitchenId)
       ]);
       setData(dashData);
       setInventoryItems(invData);
       setNotifications(notifData || []);
+      setIsVerified(verificationStatus.verified);
       setErrorMsg("");
     } catch (err: any) {
       console.error("Failed to load chef dashboard data", err);
@@ -79,6 +82,11 @@ export const ChefDashboard = ({ user }: { user: any }) => {
   }, [loadDashboardData]);
 
   const handleStartTask = async (taskId: string) => {
+    if (!isVerified) {
+      alert("Harap lakukan verifikasi stok harian terlebih dahulu di halaman Antrean Masak.");
+      navigate("/chef/queue");
+      return;
+    }
     try {
       await api.startTask(taskId);
       showNotification("Sukses memulai proses masak!");
@@ -89,6 +97,11 @@ export const ChefDashboard = ({ user }: { user: any }) => {
   };
 
   const handleFinishTask = async (taskId: string) => {
+    if (!isVerified) {
+      alert("Harap lakukan verifikasi stok harian terlebih dahulu di halaman Antrean Masak.");
+      navigate("/chef/queue");
+      return;
+    }
     try {
       await api.finishTask({ productionId: taskId });
       showNotification("Masakan telah selesai dimasak!");
@@ -187,53 +200,54 @@ export const ChefDashboard = ({ user }: { user: any }) => {
         )}
       </AnimatePresence>
 
-      {/* Hero Banner Header */}
-      <div className="relative overflow-hidden bg-slate-900 rounded-[32px] text-white p-8 md:p-10 shadow-xl shadow-slate-900/10">
-        {/* Glow decoration */}
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-br from-primary/30 to-emerald-500/10 rounded-full blur-[80px] -mr-32 -mt-32 pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-[0.25em]">
-              <Sparkles className="w-4 h-4 animate-pulse" />
-              <span>Pusat Operasional Dapur</span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-none">
-              Selamat Bertugas, Chef {user?.name || "Koki Utama"}! 🍳
-            </h1>
-            <p className="text-slate-400 font-medium text-sm md:text-base max-w-xl">
-              Hari ini Anda memimpin <span className="text-primary font-bold">{data?.kitchenName || "Dapur Utama"}</span> ({data?.city || "Kota"}). Pantau target porsi dan pertahankan efisiensi rasa.
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-4 bg-slate-800/80 backdrop-blur border border-slate-700/50 p-4 rounded-2xl shrink-0 self-start md:self-auto">
-            <div className="w-12 h-12 rounded-xl bg-primary-light/10 text-primary flex items-center justify-center shadow-inner">
-              <Clock className="w-6 h-6 animate-pulse" />
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard Chef</h1>
+          <p className="text-slate-600 font-bold text-[11px] uppercase tracking-widest mt-2 px-1">
+            {data?.kitchenName || "Dapur Utama"} • {data?.city || "Kota"} • Shift Pagi (06:00 - 14:00)
+          </p>
+        </div>
+        <button 
+          onClick={() => loadDashboardData(true)}
+          disabled={refreshing}
+          className="p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer border border-slate-100"
+          title="Perbarui Data"
+        >
+          <RefreshCw className={cn("w-5 h-5", refreshing && "animate-spin")} />
+        </button>
+      </div>
+
+      {/* Verification Warning Alert */}
+      {!isVerified && (
+        <Card className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-amber-100 text-amber-600 rounded-2xl shrink-0">
+              <AlertTriangle className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Shift Aktif Anda</p>
-              <p className="text-sm font-black text-white tracking-tight">Shift Pagi</p>
-              <p className="text-[10px] text-slate-500 font-bold mt-0.5">06:00 - 14:00 WIB</p>
+              <h4 className="font-extrabold text-slate-800 text-sm tracking-tight">Verifikasi Stok Harian Dapur Belum Dilakukan!</h4>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Harap selaraskan sisa stok fisik dapur Anda terlebih dahulu di menu Antrean Masak sebelum memulai proses memasak.</p>
             </div>
-            <button 
-              onClick={() => loadDashboardData(true)}
-              disabled={refreshing}
-              className="ml-4 p-2 rounded-xl bg-slate-700/50 hover:bg-slate-700 text-slate-350 hover:text-white transition-colors cursor-pointer"
-              title="Perbarui Data"
-            >
-              <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
-            </button>
           </div>
-        </div>
-      </div>
+          <Button 
+            onClick={() => navigate("/chef/queue")}
+            className="py-3.5 px-6 rounded-2xl font-black uppercase tracking-widest text-xs bg-amber-600 hover:bg-amber-700 text-white shrink-0 cursor-pointer w-full sm:w-auto"
+          >
+            Lakukan Verifikasi
+          </Button>
+        </Card>
+      )}
 
       {/* Error Banner */}
       {errorMsg && (
-        <Card className="bg-red-50 border-2 border-red-100 p-6 rounded-[28px] flex items-center gap-4">
-          <AlertTriangle className="w-8 h-8 text-red-500 shrink-0" />
+        <Card className="bg-red-50 border border-red-100 p-4 rounded-2xl flex items-center gap-4">
+          <div className="p-3 bg-red-100 text-red-500 rounded-2xl shrink-0">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
           <div>
-            <h4 className="font-extrabold text-slate-800 text-base">Terjadi Kendala Teknis</h4>
-            <p className="text-slate-650 text-sm mt-1">{errorMsg}</p>
+            <h4 className="font-extrabold text-slate-800 text-sm tracking-tight">Terjadi Kendala Teknis</h4>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{errorMsg}</p>
           </div>
         </Card>
       )}
@@ -242,21 +256,23 @@ export const ChefDashboard = ({ user }: { user: any }) => {
       {notifications.filter(n => !n.isRead).length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-lg font-black text-slate-800 tracking-tighter">Pemberitahuan Sistem (Kekurangan Bahan)</h3>
-            <span className="text-[10px] font-black text-white bg-red-500 px-3 py-1 rounded-full uppercase tracking-widest animate-pulse">
+            <h3 className="text-sm font-extrabold text-slate-800 tracking-tight">Pemberitahuan Sistem (Kekurangan Bahan)</h3>
+            <span className="text-[9px] font-black text-white bg-red-500 px-3 py-1 rounded-full uppercase tracking-widest animate-pulse">
               {notifications.filter(n => !n.isRead).length} Baru
             </span>
           </div>
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-3">
             {notifications.filter(n => !n.isRead).map((notif: any) => (
-              <Card key={notif.id} className="p-6 bg-red-50/50 border-2 border-red-100/60 rounded-[24px] flex flex-col md:flex-row gap-4 justify-between items-start md:items-center hover:shadow-md transition-all">
+              <Card key={notif.id} className="p-4 bg-red-50/50 border border-red-100 rounded-2xl flex flex-col md:flex-row gap-4 justify-between items-start md:items-center hover:shadow-md transition-all">
                 <div className="flex gap-4 items-start flex-1 min-w-0">
-                  <AlertTriangle className="w-6 h-6 text-red-500 shrink-0 mt-0.5 animate-pulse" />
+                  <div className="p-2.5 bg-red-100 text-red-500 rounded-2xl shrink-0">
+                    <AlertTriangle className="w-5 h-5 animate-pulse" />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-850 leading-relaxed">
+                    <p className="text-sm font-bold text-slate-800 leading-relaxed">
                       {notif.message}
                     </p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">
+                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-2">
                       {new Date(notif.createdAt).toLocaleString("id-ID")}
                     </p>
                   </div>
@@ -264,7 +280,7 @@ export const ChefDashboard = ({ user }: { user: any }) => {
                 <div className="flex gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0 justify-end">
                   <Button 
                     onClick={() => handleCreateRestockRequestFromNotification(notif)}
-                    className="h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white border-none flex items-center gap-1.5 cursor-pointer w-full md:w-auto"
+                    className="py-3.5 px-5 rounded-2xl font-black uppercase tracking-widest text-xs bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer w-full md:w-auto"
                   >
                     <Send className="w-3.5 h-3.5" />
                     Buat Permintaan
@@ -450,7 +466,13 @@ export const ChefDashboard = ({ user }: { user: any }) => {
                         {isNotStarted && (
                           <Button 
                             onClick={() => handleStartTask(item.id)}
-                            className="bg-primary hover:bg-primary-dark text-white text-[10px] font-black uppercase tracking-widest h-9 px-4 rounded-xl shadow-lg shadow-primary/10 transition-all active:scale-95 cursor-pointer"
+                            disabled={!isVerified}
+                            className={cn(
+                              "text-[10px] font-black uppercase tracking-widest h-9 px-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center cursor-pointer",
+                              !isVerified
+                                ? "bg-slate-300 text-slate-500 shadow-none cursor-not-allowed pointer-events-none opacity-60"
+                                : "bg-primary hover:bg-primary-dark shadow-primary/10 text-white"
+                            )}
                           >
                             <Play className="w-3.5 h-3.5 mr-1.5 fill-current" />
                             Mulai Masak
@@ -459,7 +481,13 @@ export const ChefDashboard = ({ user }: { user: any }) => {
                         {isCooking && (
                           <Button 
                             onClick={() => handleFinishTask(item.id)}
-                            className="bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-black uppercase tracking-widest h-9 px-4 rounded-xl shadow-lg shadow-orange-500/10 transition-all active:scale-95 cursor-pointer"
+                            disabled={!isVerified}
+                            className={cn(
+                              "text-[10px] font-black uppercase tracking-widest h-9 px-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center cursor-pointer",
+                              !isVerified
+                                ? "bg-slate-300 text-slate-500 shadow-none cursor-not-allowed pointer-events-none opacity-60"
+                                : "bg-orange-500 hover:bg-orange-600 shadow-orange-500/20 text-white"
+                            )}
                           >
                             <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                             Selesai Masak
@@ -570,7 +598,9 @@ export const ChefDashboard = ({ user }: { user: any }) => {
                         
                         {/* Packaging Container name with capacity in bracket */}
                         <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-                          {stock.container} {stock.package_capacity !== null && `(${stock.package_capacity} ${stock.package_unit})`}
+                          {stock.package_capacity !== null
+                            ? `${stock.qty_packed > 0 ? `${stock.qty_packed} ` : ''}${stock.container} (@ ${stock.package_capacity} ${stock.package_unit})${stock.qty_loose > 0 ? ` + ${stock.qty_loose} ${stock.package_unit}` : ''}`
+                            : stock.container}
                         </p>
 
                         <div className="flex flex-wrap items-center gap-2 mt-2">
