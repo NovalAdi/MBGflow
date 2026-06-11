@@ -196,4 +196,28 @@ export const api = {
   getWastage: async (): Promise<any[]> => {
     return request<any[]>("/wastage");
   },
+
+  getNotifications: async (kitchenId?: string): Promise<any[]> => {
+    const query = kitchenId ? `?kitchenId=${encodeURIComponent(kitchenId)}` : "";
+    return request<any[]>(`/notifications${query}`);
+  },
+
+  markNotificationRead: async (id: string): Promise<any> => {
+    return request<any>(`/notifications/${encodeURIComponent(id)}/read`, {
+      method: "PUT",
+    });
+  },
+
+  deleteNotification: async (id: string): Promise<any> => {
+    return request<any>(`/notifications/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+  
+  createNotification: async (kitchenId: string, message: string): Promise<any> => {
+    return request<any>("/notifications", {
+      method: "POST",
+      body: JSON.stringify({ kitchenId, message }),
+    });
+  },
 };

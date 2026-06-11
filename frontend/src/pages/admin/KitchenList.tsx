@@ -8,21 +8,34 @@ import { Utensils, MapPin, MoreVertical, Plus, Edit2, Trash2, ChevronRight, Sear
 import { Link } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
 
+const INDO_DAYS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
 export const KitchenList = () => {
   const [kitchens, setKitchens] = React.useState<Kitchen[]>([]);
+  const [plans, setPlans] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [currentKitchen, setCurrentKitchen] = React.useState<Partial<Kitchen> | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [sortBy, setSortBy] = React.useState<"name" | "capacity-desc" | "capacity-asc">("name");
 
+  const todayIndex = new Date().getDay();
+  let todayDayName = INDO_DAYS[todayIndex];
+  if (todayDayName === "Minggu") {
+    todayDayName = "Senin";
+  }
+
   const fetchKitchens = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await api.getKitchens();
-      setKitchens(data);
+      const [kitchensData, plansData] = await Promise.all([
+        api.getKitchens(),
+        api.getProductionPlans()
+      ]);
+      setKitchens(kitchensData);
+      setPlans(plansData || []);
     } catch (error) {
-      console.error("Failed to fetch kitchens", error);
+      console.error("Failed to fetch kitchens and plans", error);
     } finally {
       setIsLoading(false);
     }
@@ -149,18 +162,36 @@ export const KitchenList = () => {
                   </div>
                 </div>
               
-                <div className="pt-2 space-y-4">
-                  <div className="flex items-center justify-between px-1">
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest font-sans">Kapasitas Produksi</span>
-                    <span className="text-[10px] font-black text-primary uppercase tracking-widest font-sans">{kitchen.capacity.toLocaleString()} Porsi</span>
-                  </div>
-                  <div className="w-full h-3 bg-slate-50 rounded-full overflow-hidden shadow-inner p-1">
-                    <div 
-                      className="h-full bg-primary rounded-full transition-all duration-1000 ease-out shadow-lg shadow-primary/20"
-                      style={{ width: `${(kitchen.capacity / 5000) * 100}%` }}
-                    />
-                  </div>
-                </div>
+                {(() => {
+                  const totalPortionsToday = plans
+                    .filter(p => p.kitchenId === kitchen.id && p.day === todayDayName)
+                    .reduce((sum, p) => sum + (Number(p.portions) || 0), 0);
+                  const usedPercentage = Math.min(100, Math.round((totalPortionsToday / kitchen.capacity) * 100));
+
+                  return (
+                    <div className="pt-2 space-y-4">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest font-sans">Utilisasi Hari Ini ({todayDayName})</span>
+                        <span className="text-[10px] font-black text-primary uppercase tracking-widest font-sans">
+                          {totalPortionsToday.toLocaleString()} / {kitchen.capacity.toLocaleString()} ({usedPercentage}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-50 rounded-full overflow-hidden shadow-inner p-1">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full transition-all duration-1000 ease-out shadow-lg",
+                            usedPercentage > 90 
+                              ? "bg-red-500 shadow-red-500/20" 
+                              : usedPercentage > 75 
+                                ? "bg-amber-500 shadow-amber-500/20" 
+                                : "bg-primary shadow-primary/20"
+                          )}
+                          style={{ width: `${usedPercentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
               </Card>
             </Link>
           ))

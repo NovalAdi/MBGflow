@@ -14,4 +14,10 @@ router.post('/production-logs/finish', productionController.finishProductionLog)
 router.post('/production-logs/start', productionController.startProductionLog);
 router.get('/menus', productionController.getMenus);
 
+// Notifications endpoints
+router.get('/notifications', productionController.getNotifications);
+router.post('/notifications', productionController.createNotification);
+router.put('/notifications/:id/read', productionController.markNotificationRead);
+router.delete('/notifications/:id', productionController.deleteNotification);
+
 module.exports = router;

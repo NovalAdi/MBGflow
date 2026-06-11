@@ -458,9 +458,7 @@ export const ProductionPlanning = () => {
     }
   };
   const [isFormModalOpen, setFormModalOpen] = React.useState(false);
-  const [isDetailModalOpen, setDetailModalOpen] = React.useState(false);
   const [selectedDay, setSelectedDay] = React.useState("");
-  const [selectedPlan, setSelectedPlan] = React.useState<any>(null);
   const [isEditMode, setIsEditMode] = React.useState(false);
 
   // Form State
@@ -506,44 +504,6 @@ export const ProductionPlanning = () => {
     fetchData();
   }, []);
 
-  const calculateShortagesForPlan = (plan: any) => {
-    if (!plan) return [];
-    return planResults[plan.id]?.shortages?.map(s => ({
-      material: s.material,
-      amount: `${s.shortage.toFixed(2)} ${s.unit}`
-    })) || [];
-  };
-
-  const handleRequestStock = (materials: { material: string, amount: string }[]) => {
-    navigate("/admin/request-stock", { state: { materials } });
-  };
-
-  const handleRequestAllWeeklyShortages = () => {
-    const allMaterialsShortage: Record<string, { amount: number, unit: string }> = {};
-    
-    Object.values(planResults).forEach((res: any) => {
-      if (res.isLow) {
-        res.shortages.forEach((sh: any) => {
-          if (!allMaterialsShortage[sh.material]) {
-            allMaterialsShortage[sh.material] = { amount: 0, unit: sh.unit };
-          }
-          allMaterialsShortage[sh.material].amount += sh.shortage;
-        });
-      }
-    });
-
-    const finalShortages = Object.keys(allMaterialsShortage).map(material => ({
-      material,
-      amount: `${allMaterialsShortage[material].amount.toFixed(2)} ${allMaterialsShortage[material].unit}`
-    }));
-
-    if (finalShortages.length > 0) {
-      handleRequestStock(finalShortages);
-    } else {
-      alert("Tidak ada kekurangan bahan untuk minggu ini.");
-    }
-  };
-
   const handleSavePlan = async () => {
     if (!formData.portions || formData.portions <= 0) {
       alert("Harap masukkan jumlah porsi yang valid.");
@@ -583,11 +543,23 @@ export const ProductionPlanning = () => {
     
     try {
       await api.deleteProductionPlan(planId);
-      setDetailModalOpen(false);
+      setFormModalOpen(false);
+      setIsEditMode(false);
       await fetchData();
     } catch (error) {
       console.error("Error deleting production plan:", error);
       alert("Gagal menghapus rencana produksi: " + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
+  const handleSendShortageNotification = async () => {
+    if (!formData.kitchenId) return;
+    try {
+      await api.createNotification(formData.kitchenId, shortageMessage);
+      alert("Notifikasi kekurangan bahan berhasil dikirim ke Dapur / Akun Chef!");
+    } catch (error) {
+      console.error("Failed to send manual notification:", error);
+      alert("Gagal mengirim notifikasi: " + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -602,13 +574,11 @@ export const ProductionPlanning = () => {
       portions: item.portions,
       note: item.note || ""
     });
-    setDetailModalOpen(false);
     setFormModalOpen(true);
   };
 
   const handleItemClick = (item: any, day: string) => {
-    setSelectedPlan({ ...item, day });
-    setDetailModalOpen(true);
+    handleEditClick(item, day);
   };
 
   const handleAddClick = (day: string) => {
@@ -624,6 +594,14 @@ export const ProductionPlanning = () => {
     setFormModalOpen(true);
   };
 
+  const isItemLow = React.useCallback((item: any) => {
+    return planResults[item.id]?.isLow || false;
+  }, [planResults]);
+
+  const isItemOverCapacity = React.useCallback((item: any) => {
+    return planResults[item.id]?.isOverCapacity || false;
+  }, [planResults]);
+
   // Calculation Logic for Form
   const selectedMenuData = menus.find(m => m.name === formData.menu);
   const calculatedMaterials = React.useMemo(() => {
@@ -634,47 +612,38 @@ export const ProductionPlanning = () => {
       const available = item 
         ? item.batches
             .filter((b: any) => !formData.kitchenId || b.kitchenId === formData.kitchenId)
-            .reduce((sum: number, b: any) => sum + (parseFloat(b.weight) || 0), 0)
+            .reduce((sum: number, b: any) => {
+              let val = Number(b.weight_value) || 0;
+              let baseUnit = b.unit || "kg";
+              const cap = Number(b.package_capacity);
+              const pkgU = b.package_unit;
+
+              if (!isNaN(cap) && cap > 0 && pkgU) {
+                val = val * cap;
+                baseUnit = pkgU;
+              }
+
+              const uLower = baseUnit.toLowerCase();
+              if (uLower === 'g' || uLower === 'ml') {
+                val = val / 1000;
+              }
+              return sum + val;
+            }, 0)
         : 0;
       const isLow = needed > available;
       return { ...ing, needed, available, isLow };
     });
-  }, [formData.menu, formData.portions, selectedMenuData]);
+  }, [formData.menu, formData.portions, selectedMenuData, inventory, formData.kitchenId]);
 
   const hasShortage = calculatedMaterials.some(m => m.isLow);
 
-  // Calculation for Detail View
-  const detailMaterials = React.useMemo(() => {
-    if (!selectedPlan) return [];
-    const menuData = menus.find(m => m.name === selectedPlan.m || m.name === selectedPlan.menuName);
-    if (!menuData) return [];
-    
-    const simResult = planResults[selectedPlan.id];
-    
-    return menuData.ingredients.map(ing => {
-      const needed = Number((ing.perPortion * selectedPlan.portions).toFixed(2));
-      const isLow = simResult?.shortages?.some(s => s.material === ing.name) || false;
-      const shInfo = simResult?.shortages?.find(s => s.material === ing.name);
-      const remainingNeeded = shInfo ? shInfo.shortage : 0;
-      const available = Number((needed - remainingNeeded).toFixed(2));
-
-      return {
-        name: ing.name,
-        needed,
-        available: Math.max(0, available),
-        isLow,
-        shortageText: shInfo?.details || ""
-      };
-    });
-  }, [selectedPlan, planResults, menus]);
-
-  const isItemLow = React.useCallback((item: any) => {
-    return planResults[item.id]?.isLow || false;
-  }, [planResults]);
-
-  const isItemOverCapacity = React.useCallback((item: any) => {
-    return planResults[item.id]?.isOverCapacity || false;
-  }, [planResults]);
+  const shortageMessage = React.useMemo(() => {
+    const shortagesInfo = calculatedMaterials
+      .filter(m => m.isLow)
+      .map(m => `${m.name} (kurang ${(m.needed - m.available).toFixed(2)} ${m.unit})`)
+      .join(", ");
+    return `SCM Admin: Rencana produksi ${formData.menu} (${formData.portions} porsi) pada hari ${selectedDay} kekurangan bahan: ${shortagesInfo}.`;
+  }, [calculatedMaterials, formData.menu, formData.portions, selectedDay]);
 
   const { selectedKitchenCapacity, otherPlansPortionsForDay, isFormOverCapacity } = React.useMemo(() => {
     const selectedKitchen = kitchens.find(k => k.id === formData.kitchenId);
@@ -705,13 +674,6 @@ export const ProductionPlanning = () => {
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Kalender Produksi</h2>
           <p className="text-slate-400 font-bold text-[11px] uppercase tracking-widest mt-2">Jadwal Operasional Dapur</p>
         </div>
-        <Button 
-          className="shadow-xl shadow-primary/20 flex items-center gap-3 active:scale-95 transition-all"
-          onClick={handleRequestAllWeeklyShortages}
-        >
-          <PackageSearch className="w-5 h-5 font-bold" />
-          Minta Kekurangan Stok
-        </Button>
       </div>
 
       <DndContext
@@ -763,137 +725,6 @@ export const ProductionPlanning = () => {
           ) : null}
         </DragOverlay>
       </DndContext>
-
-      {/* Detail Plan Modal */}
-      <Modal 
-        isOpen={isDetailModalOpen} 
-        onClose={() => setDetailModalOpen(false)} 
-        title="Detail Audit Produksi"
-        className="max-w-3xl"
-      >
-        {selectedPlan && (
-          <div className="space-y-10 py-4">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <h4 className="font-black text-xs text-slate-400 uppercase tracking-[0.2em]">Data Perencanaan</h4>
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="secondary" 
-                  className="h-11 px-5 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 shadow-sm border-none bg-slate-100 hover:bg-slate-200 text-slate-700"
-                  onClick={() => handleEditClick(selectedPlan, selectedPlan.day)}
-                >
-                  <Edit2 className="w-4 h-4" />
-                  Edit Rencana
-                </Button>
-                <button 
-                  className="h-11 px-5 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 text-red-600 bg-red-50 hover:bg-red-100 transition-all shadow-sm border border-red-100"
-                  onClick={() => handleDeletePlan(selectedPlan.id)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Hapus
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-8">
-              <div className="p-8 bg-slate-50/50 rounded-[32px] space-y-2 border border-slate-50">
-                <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Masakan / Menu</p>
-                <p className="text-3xl font-black text-slate-800 tracking-tighter leading-none">{selectedPlan.menuName || selectedPlan.m}</p>
-              </div>
-              <div className="p-8 bg-slate-50/50 rounded-[32px] space-y-2 border border-slate-50">
-                <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Target Kapasitas</p>
-                <p className="text-3xl font-black text-primary tracking-tighter leading-none">{selectedPlan.portions} <span className="text-xs uppercase font-bold tracking-widest text-primary/50 ml-1">Porsi</span></p>
-              </div>
-              <div className="p-8 bg-slate-50/50 rounded-[32px] space-y-3 border border-slate-50 col-span-2">
-                <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Penugasan Dapur</p>
-                <div className="flex items-center gap-4">
-                   <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-primary shadow-sm border border-slate-50">
-                      <PackageSearch className="w-5 h-5" />
-                   </div>
-                   <p className="text-2xl font-black text-slate-800 uppercase tracking-tighter leading-none">{selectedPlan.kitchenName || selectedPlan.k} Production Hub</p>
-                </div>
-              </div>
-              <div className="p-8 bg-slate-50/50 rounded-[32px] space-y-3 border border-slate-50 col-span-2">
-                <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Catatan Produksi</p>
-                <p className="text-sm font-medium text-slate-600 leading-relaxed italic">
-                  {selectedPlan.note || "Tidak ada catatan tambahan untuk produksi ini."}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="flex items-center justify-between px-2">
-                <h4 className="font-black text-xs text-slate-800 uppercase tracking-widest">Cek Integritas Bahan</h4>
-                <Badge 
-                  status={isItemLow(selectedPlan) ? "Kekurangan Bahan" : "Bahan Tersedia"} 
-                  className={cn("uppercase font-black text-[9px] tracking-widest px-4 py-1.5 rounded-full border-none", isItemLow(selectedPlan) ? "bg-red-50 text-red-500" : "bg-primary-light text-primary")}
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 gap-4">
-                {detailMaterials.map((mat: any, i) => (
-                  <div 
-                    key={i} 
-                    className={cn(
-                      "p-6 rounded-[28px] flex flex-col sm:flex-row sm:items-center justify-between border-2 transition-all gap-4",
-                      mat.isLow ? "bg-red-50/50 border-red-100 shadow-sm" : "bg-white border-slate-50"
-                    )}
-                  >
-                    <div className="flex items-center gap-5">
-                       <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner shrink-0", mat.isLow ? "bg-white text-red-500 animate-pulse" : "bg-slate-50 text-slate-300")}>
-                          <Check className="w-5 h-5" />
-                       </div>
-                       <div>
-                        <p className="text-lg font-black text-slate-800 tracking-tight">{mat.name}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Kebutuhan: <span className="text-slate-800 font-extrabold">{mat.needed} {mat.unit}</span></p>
-                        {mat.isLow && mat.shortageText && (
-                          <div className="text-[10px] text-red-600 font-extrabold uppercase tracking-wide mt-2 px-3 py-1.5 rounded-xl bg-red-100/50 border border-red-100/40 w-fit">
-                            ⚠️ {mat.shortageText}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {mat.isLow && (
-                      <div className="text-right flex items-center gap-4 sm:gap-6 shrink-0 self-end sm:self-auto">
-                        <div className="text-right">
-                          <p className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-1 opacity-60">DEFISIT</p>
-                          <p className="font-black text-red-600 text-sm md:text-base tracking-tighter leading-none">{(mat.needed - mat.available).toFixed(2)} {mat.unit}</p>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-12 w-12 rounded-2xl bg-white shadow-md text-red-500 hover:bg-red-50 border-none transition-all p-0 flex items-center justify-center group"
-                          onClick={() => {
-                            setDetailModalOpen(false);
-                            handleRequestStock([{ material: mat.name, amount: `${(mat.needed - mat.available).toFixed(2)} ${mat.unit}` }]);
-                          }}
-                        >
-                          <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-              <div className="pt-8 flex gap-4">
-                <Button variant="ghost" className="flex-1 py-6 rounded-3xl" onClick={() => setDetailModalOpen(false)}>Kembali</Button>
-                {isItemLow(selectedPlan) ? (
-                  <Button variant="danger" className="flex-1 py-6 rounded-3xl" onClick={() => {
-                    setDetailModalOpen(false);
-                    handleRequestStock(calculateShortagesForPlan(selectedPlan));
-                  }}>
-                    Minta Kekurangan Bahan
-                  </Button>
-                ) : (
-                  <Button variant="primary" className="flex-1 py-6 rounded-3xl" onClick={() => setDetailModalOpen(false)}>
-                    Finalisasi Rencana
-                  </Button>
-                )}
-              </div>
-          </div>
-        )}
-      </Modal>
 
       {/* Form Production Modal */}
       <Modal 
@@ -964,18 +795,6 @@ export const ProductionPlanning = () => {
                 />
               </div>
             </div>
-            <Button 
-              className={cn(
-                "w-full py-6 rounded-[24px] font-black uppercase tracking-[0.15em] text-sm shadow-2xl transition-all active:scale-[0.98]",
-                hasShortage 
-                  ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/20" 
-                  : "bg-primary hover:bg-primary-dark text-white shadow-primary/20"
-              )} 
-              onClick={handleSavePlan}
-            >
-              <Check className="w-5 h-5 mr-3" />
-              {isEditMode ? "Simpan Perubahan" : "Simpan Rencana"}
-            </Button>
           </div>
 
           <div className="lg:col-span-2 space-y-8">
@@ -1036,6 +855,44 @@ export const ProductionPlanning = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="lg:col-span-5 pt-8 border-t border-slate-100 flex flex-wrap gap-4">
+            {isEditMode && (
+              <Button 
+                type="button"
+                variant="danger"
+                className="flex-1 min-w-[150px] py-5 rounded-[24px] font-black uppercase tracking-[0.15em] text-sm shadow-xl transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer"
+                onClick={() => handleDeletePlan(formData.id)}
+              >
+                <Trash2 className="w-5 h-5 mr-3" />
+                Hapus Rencana
+              </Button>
+            )}
+            {hasShortage && (
+              <Button 
+                type="button"
+                variant="outline"
+                className="flex-1 min-w-[200px] py-5 rounded-[24px] font-black uppercase tracking-[0.15em] text-sm shadow-md transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer border-2 border-amber-500 hover:bg-amber-50 text-amber-700"
+                onClick={handleSendShortageNotification}
+              >
+                <Send className="w-5 h-5 mr-3" />
+                Kirim Notif Dapur
+              </Button>
+            )}
+            <Button 
+              type="button"
+              className={cn(
+                "flex-1 min-w-[180px] py-5 rounded-[24px] font-black uppercase tracking-[0.15em] text-sm shadow-xl transition-all active:scale-[0.98] flex items-center justify-center cursor-pointer",
+                hasShortage 
+                  ? "bg-red-500 hover:bg-red-650 text-white shadow-red-500/20" 
+                  : "bg-[#15803D] hover:bg-[#166534] text-white shadow-[#15803D]/20"
+              )} 
+              onClick={handleSavePlan}
+            >
+              <Check className="w-5 h-5 mr-3" />
+              {isEditMode ? "Simpan Perubahan" : "Simpan Rencana"}
+            </Button>
           </div>
         </div>
       </Modal>

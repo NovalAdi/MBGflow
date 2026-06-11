@@ -25,10 +25,13 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 export const ChefDashboard = ({ user }: { user: any }) => {
+  const navigate = useNavigate();
   const [data, setData] = React.useState<any>(null);
   const [inventoryItems, setInventoryItems] = React.useState<any[]>([]);
+  const [notifications, setNotifications] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   
@@ -46,12 +49,14 @@ export const ChefDashboard = ({ user }: { user: any }) => {
     }
 
     try {
-      const [dashData, invData] = await Promise.all([
+      const [dashData, invData, notifData] = await Promise.all([
         api.getChefDashboardData(user.kitchenId),
-        api.getInventory()
+        api.getInventory(),
+        api.getNotifications(user.kitchenId)
       ]);
       setData(dashData);
       setInventoryItems(invData);
+      setNotifications(notifData || []);
       setErrorMsg("");
     } catch (err: any) {
       console.error("Failed to load chef dashboard data", err);
@@ -91,6 +96,43 @@ export const ChefDashboard = ({ user }: { user: any }) => {
     } catch (err: any) {
       alert(err.message || "Gagal menyelesaikan tugas.");
     }
+  };
+
+  const handleMarkNotificationRead = async (id: string) => {
+    try {
+      await api.markNotificationRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: 1 } : n));
+      showNotification("Notifikasi ditandai dibaca!");
+    } catch (err: any) {
+      console.error("Failed to mark notification read", err);
+    }
+  };
+
+  const parseShortageNotification = (message: string) => {
+    const parts = message.split("kekurangan bahan:");
+    if (parts.length < 2) return [];
+    const itemsText = parts[1].replace(/\.$/, "").trim();
+    const items = itemsText.split(",").map(item => {
+      const match = item.match(/(.+?)\s*\(kurang\s+(.+?)\)/);
+      if (match) {
+        return {
+          material: match[1].trim(),
+          amount: match[2].trim()
+        };
+      }
+      return null;
+    }).filter((x): x is { material: string; amount: string } => x !== null);
+    return items;
+  };
+
+  const handleCreateRestockRequestFromNotification = (notif: any) => {
+    const parsedShortages = parseShortageNotification(notif.message);
+    navigate("/chef/restock", { 
+      state: { 
+        prefillShortages: parsedShortages,
+        notificationId: notif.id
+      } 
+    });
   };
 
   const showNotification = (msg: string) => {
@@ -191,9 +233,47 @@ export const ChefDashboard = ({ user }: { user: any }) => {
           <AlertTriangle className="w-8 h-8 text-red-500 shrink-0" />
           <div>
             <h4 className="font-extrabold text-slate-800 text-base">Terjadi Kendala Teknis</h4>
-            <p className="text-slate-600 text-sm mt-1">{errorMsg}</p>
+            <p className="text-slate-650 text-sm mt-1">{errorMsg}</p>
           </div>
         </Card>
+      )}
+
+      {/* Notifications Section */}
+      {notifications.filter(n => !n.isRead).length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-lg font-black text-slate-800 tracking-tighter">Pemberitahuan Sistem (Kekurangan Bahan)</h3>
+            <span className="text-[10px] font-black text-white bg-red-500 px-3 py-1 rounded-full uppercase tracking-widest animate-pulse">
+              {notifications.filter(n => !n.isRead).length} Baru
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            {notifications.filter(n => !n.isRead).map((notif: any) => (
+              <Card key={notif.id} className="p-6 bg-red-50/50 border-2 border-red-100/60 rounded-[24px] flex flex-col md:flex-row gap-4 justify-between items-start md:items-center hover:shadow-md transition-all">
+                <div className="flex gap-4 items-start flex-1 min-w-0">
+                  <AlertTriangle className="w-6 h-6 text-red-500 shrink-0 mt-0.5 animate-pulse" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-850 leading-relaxed">
+                      {notif.message}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">
+                      {new Date(notif.createdAt).toLocaleString("id-ID")}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0 justify-end">
+                  <Button 
+                    onClick={() => handleCreateRestockRequestFromNotification(notif)}
+                    className="h-10 px-5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white border-none flex items-center gap-1.5 cursor-pointer w-full md:w-auto"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Buat Permintaan
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Main Content Grid */}

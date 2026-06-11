@@ -78,6 +78,8 @@ async function createProductionPlan(req, res) {
       [planId, kitchen.id, kitchen.name, menuData.name, Number(portions), kitchen.city || 'Jakarta', new Date().toISOString(), note || '', 'Pending']
     );
 
+    await checkAndNotifyShortage(planId, connection);
+
     await connection.commit();
     connection.release();
 
@@ -152,6 +154,8 @@ async function updateProductionPlan(req, res) {
       'UPDATE production_logs SET kitchenId = ?, kitchen = ?, menu = ?, servings = ?, city = ?, qaNotes = ? WHERE id = ?',
       [kitchen.id, kitchen.name, menuData.name, mergedPortions, kitchen.city || 'Jakarta', mergedNote || '', id]
     );
+
+    await checkAndNotifyShortage(id, connection);
 
     await connection.commit();
     connection.release();
@@ -330,6 +334,129 @@ async function getMenus(req, res) {
   }
 }
 
+async function checkAndNotifyShortage(planId, connection) {
+  try {
+    const [plans] = await connection.query('SELECT * FROM production_plans WHERE id = ?', [planId]);
+    if (plans.length === 0) return;
+    const plan = plans[0];
+
+    const [ingredients] = await connection.query('SELECT * FROM ingredients WHERE menuId = ?', [plan.menuId]);
+    if (ingredients.length === 0) return;
+
+    const shortages = [];
+    for (const ing of ingredients) {
+      const needed = Number(ing.perPortion) * Number(plan.portions);
+      
+      const [invItems] = await connection.query('SELECT id FROM inventory WHERE LOWER(name) = ?', [ing.name.toLowerCase()]);
+      if (invItems.length === 0) {
+        shortages.push(`${ing.name} (kurang ${needed.toFixed(1)} ${ing.unit})`);
+        continue;
+      }
+      const invId = invItems[0].id;
+      
+      const [batches] = await connection.query(
+        'SELECT * FROM inventory_batches WHERE inventoryId = ? AND kitchenId = ?',
+        [invId, plan.kitchenId]
+      );
+      
+      let available = 0;
+      for (const batch of batches) {
+        let val = Number(batch.weight_value) || 0;
+        let baseUnit = batch.unit || "kg";
+        const cap = Number(batch.package_capacity);
+        const pkgU = batch.package_unit;
+
+        if (!isNaN(cap) && cap > 0 && pkgU) {
+          val = val * cap;
+          baseUnit = pkgU;
+        }
+
+        const uLower = baseUnit.toLowerCase();
+        if (uLower === 'g' || uLower === 'ml') {
+          val = val / 1000;
+        }
+        available += val;
+      }
+
+      if (needed > available) {
+        const diff = needed - available;
+        shortages.push(`${ing.name} (kurang ${diff.toFixed(1)} ${ing.unit})`);
+      }
+    }
+
+    if (shortages.length > 0) {
+      const message = `Peringatan: Rencana produksi ${plan.menuName} (${plan.portions} porsi) pada hari ${plan.day} kekurangan bahan: ${shortages.join(', ')}.`;
+      const notificationId = `ntf-${Date.now()}`;
+      await connection.query(
+        'INSERT INTO notifications (id, kitchenId, message, isRead, createdAt) VALUES (?, ?, ?, 0, ?)',
+        [notificationId, plan.kitchenId, message, new Date().toISOString()]
+      );
+    }
+  } catch (error) {
+    console.error('Error checking and notifying shortage:', error);
+  }
+}
+
+async function getNotifications(req, res) {
+  await delay(50);
+  const { kitchenId } = req.query;
+  try {
+    let rows;
+    if (kitchenId) {
+      [rows] = await db.query('SELECT * FROM notifications WHERE kitchenId = ? ORDER BY createdAt DESC', [kitchenId]);
+    } else {
+      [rows] = await db.query('SELECT * FROM notifications ORDER BY createdAt DESC');
+    }
+    res.json(rows);
+  } catch (error) {
+    console.error('Fetch notifications error:', error);
+    res.status(500).json({ error: 'Server error fetching notifications.' });
+  }
+}
+
+async function markNotificationRead(req, res) {
+  await delay(50);
+  const { id } = req.params;
+  try {
+    await db.query('UPDATE notifications SET isRead = 1 WHERE id = ?', [id]);
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error('Mark notification read error:', error);
+    res.status(500).json({ error: 'Server error updating notification.' });
+  }
+}
+
+async function deleteNotification(req, res) {
+  await delay(50);
+  const { id } = req.params;
+  try {
+    await db.query('DELETE FROM notifications WHERE id = ?', [id]);
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error('Delete notification error:', error);
+    res.status(500).json({ error: 'Server error deleting notification.' });
+  }
+}
+
+async function createNotification(req, res) {
+  await delay(50);
+  const { kitchenId, message } = req.body;
+  if (!kitchenId || !message) {
+    return res.status(400).json({ error: 'KitchenId and message are required.' });
+  }
+  try {
+    const notificationId = `ntf-${Date.now()}`;
+    await db.query(
+      'INSERT INTO notifications (id, kitchenId, message, isRead, createdAt) VALUES (?, ?, ?, 0, ?)',
+      [notificationId, kitchenId, message, new Date().toISOString()]
+    );
+    res.status(201).json({ id: notificationId, kitchenId, message, isRead: 0, createdAt: new Date().toISOString() });
+  } catch (error) {
+    console.error('Create notification error:', error);
+    res.status(500).json({ error: 'Server error creating notification.' });
+  }
+}
+
 module.exports = {
   getActivity,
   getProductionPlans,
@@ -338,5 +465,9 @@ module.exports = {
   deleteProductionPlan,
   finishProductionLog,
   startProductionLog,
-  getMenus
+  getMenus,
+  getNotifications,
+  markNotificationRead,
+  deleteNotification,
+  createNotification
 };

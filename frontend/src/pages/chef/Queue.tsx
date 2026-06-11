@@ -15,13 +15,23 @@ interface ExtendedProductionLog extends ProductionLog {
 
 export const ChefQueue = ({ user }: { user: any }) => {
   const [tasks, setTasks] = React.useState<ExtendedProductionLog[]>([]);
+  const [menus, setMenus] = React.useState<any[]>([]);
   const [selectedTask, setSelectedTask] = React.useState<ExtendedProductionLog | null>(null);
   const [isQAModalOpen, setQAModalOpen] = React.useState(false);
   const [isDetailModalOpen, setDetailModalOpen] = React.useState(false);
   const [handoverData, setHandoverData] = React.useState<{ id: string; qr: string } | null>(null);
 
-  const fetchTasks = React.useCallback(() => {
-    api.getActivity(user?.kitchenId).then(setTasks);
+  const fetchTasks = React.useCallback(async () => {
+    try {
+      const [tasksData, menusData] = await Promise.all([
+        api.getActivity(user?.kitchenId),
+        api.getMenus()
+      ]);
+      setTasks(tasksData || []);
+      setMenus(menusData || []);
+    } catch (error) {
+      console.error("Failed to fetch tasks and menus", error);
+    }
   }, [user?.kitchenId]);
 
   React.useEffect(() => {
@@ -119,40 +129,69 @@ export const ChefQueue = ({ user }: { user: any }) => {
           const config = getStatusConfig(task.status);
           const StatusIcon = config.icon;
 
+          const menuData = menus.find(m => m.name.toLowerCase() === task.menu.toLowerCase());
+          const ingredients = menuData ? menuData.ingredients.map((ing: any) => {
+            const needed = ing.perPortion * task.servings;
+            return {
+              name: ing.name,
+              amount: `${needed.toFixed(2)} ${ing.unit}`
+            };
+          }) : [];
+
           return (
-            <Card key={task.id} className="p-6 group hover:shadow-xl hover:shadow-primary/5 transition-all rounded-[28px] border-2 border-slate-50/50 hover:border-primary/10">
-              <div className="flex justify-between items-start mb-6">
-                <div className={cn("px-4 py-1.5 rounded-full font-black text-[9px] tracking-[0.2em] border-none uppercase shadow-sm", config.color)}>
-                  • {config.label}
+            <Card key={task.id} className="p-8 group hover:shadow-2xl hover:shadow-primary/10 transition-all rounded-[40px] border-0 bg-white flex flex-col justify-between h-full relative overflow-hidden shadow-sm">
+              <div>
+                <div className="flex justify-between items-start mb-6">
+                  <div className={cn("px-4 py-1.5 rounded-full font-black text-[9px] tracking-[0.2em] border-none uppercase shadow-sm", config.color)}>
+                    • {config.label}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">PIC</p>
+                    <p className="text-xs font-black text-slate-800 tracking-tight">{user?.name}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">PIC</p>
-                  <p className="text-xs font-black text-slate-800 tracking-tight">{user?.name}</p>
+                
+                <div className="space-y-3 mb-6">
+                  <h3 className="text-2xl font-black text-slate-800 tracking-tighter group-hover:text-primary transition-colors leading-[1.0] font-sans">
+                    {task.menu}
+                  </h3>
+                  <div className="flex items-center gap-3 mt-4">
+                    <span className="text-xl font-black text-slate-700 tracking-tighter">{task.servings} <span className="text-[10px] uppercase font-bold tracking-widest ml-0.5 text-slate-650">Porsi</span></span>
+                    <span className="w-1 h-1 rounded-full bg-slate-200" />
+                    <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Shift Pagi</span>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="space-y-3 mb-6">
-                <h3 className="text-2xl font-black text-slate-800 tracking-tighter group-hover:text-primary transition-colors leading-[0.9]">
-                  {task.menu}
-                </h3>
-                <div className="flex items-center gap-3 mt-4">
-                  <span className="text-xl font-black text-slate-700 tracking-tighter">{task.servings} <span className="text-[10px] uppercase font-bold tracking-widest ml-0.5 text-slate-600">Porsi</span></span>
-                  <span className="w-1 h-1 rounded-full bg-slate-200" />
-                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sejak {new Date(task.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+
+                {/* Ingredients List Section */}
+                <div className="mb-6 pt-4 border-t border-slate-100">
+                  <p className="text-[9px] font-black text-slate-450 uppercase tracking-[0.2em] mb-3">Rincian Bahan Baku</p>
+                  {ingredients.length > 0 ? (
+                    <div className="max-h-28 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                      {ingredients.map((ing: any, i: number) => (
+                        <div key={i} className="flex justify-between items-center bg-slate-50 rounded-xl px-4 py-2 border border-slate-100/50">
+                          <span className="text-xs font-bold text-slate-700">{ing.name}</span>
+                          <span className="text-xs font-black text-primary tracking-tight">{ing.amount}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-550 italic">Memuat rincian bahan...</p>
+                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-5 gap-3">
+              {/* Action Buttons at the bottom */}
+              <div className="grid grid-cols-5 gap-3 mt-auto pt-2">
                 <Button 
                    className={cn(
-                    "col-span-4 h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95",
+                    "col-span-4 h-12 rounded-[20px] text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center cursor-pointer",
                     task.status === 'Ready' 
-                      ? "bg-green-500 hover:bg-green-600 shadow-green-500/10" 
+                      ? "bg-green-500 hover:bg-green-600 shadow-green-500/20 text-white" 
                       : task.status === 'Cooking'
-                      ? "bg-orange-500 hover:bg-orange-600 shadow-orange-500/10"
-                      : "bg-primary hover:bg-primary-dark shadow-primary/10"
+                      ? "bg-orange-500 hover:bg-orange-600 shadow-orange-500/20 text-white"
+                      : "bg-primary hover:bg-primary-dark shadow-primary/20 text-white"
                   )}
-                  onClick={() => handleAction(task)}
+                  onClick={() => handleAction({ ...task, ingredients })}
                 >
                   <StatusIcon className="w-4 h-4 mr-2" />
                   {config.btnText}
@@ -160,8 +199,8 @@ export const ChefQueue = ({ user }: { user: any }) => {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-12 aspect-square rounded-2xl bg-slate-50 text-slate-500 hover:bg-primary/5 hover:text-primary border-none shadow-sm transition-all"
-                  onClick={() => openInfo(task)}
+                  className="h-12 aspect-square rounded-[20px] bg-slate-50 text-slate-500 hover:bg-primary/5 hover:text-primary border-none shadow-sm transition-all flex items-center justify-center"
+                  onClick={() => openInfo({ ...task, ingredients })}
                 >
                   <Info className="w-5 h-5" />
                 </Button>

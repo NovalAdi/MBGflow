@@ -55,44 +55,6 @@ export const WastageReport = () => {
 
   const uniqueCities = ["Semua", ...new Set(auditData.map(item => item.city))];
 
-  // Dynamic Pie Chart Data based on reasons in auditData
-  // Force exactly 3 categories: Expired, Human Error, Spoiled
-  const wastageStats = React.useMemo(() => {
-    const counts: Record<string, number> = { 'Kedaluwarsa': 0, 'Kelalaian Manusia': 0, 'Busuk': 0 };
-    auditData.forEach(item => {
-      let category = item.reason;
-      if (category === 'Damage' || category === 'Damage/Spoiled' || category === 'Spoiled' || category === 'Tumpah / Rusak') category = 'Busuk';
-      if (counts.hasOwnProperty(category)) {
-        counts[category]++;
-      }
-    });
-    const total = auditData.length;
-    return Object.entries(counts).map(([name, count]) => ({
-      name,
-      value: total > 0 ? Math.round((count / total) * 100) : 0
-    }));
-  }, [auditData]);
-
-  // Data for Bar Chart: Top 5 Wastage per Material
-  const materialChartData = React.useMemo(() => {
-    const counts: Record<string, number> = {};
-    auditData.forEach(item => {
-      counts[item.material] = (counts[item.material] || 0) + item.weight;
-    });
-    return Object.entries(counts)
-      .map(([name, weight]) => ({ name, weight }))
-      .sort((a, b) => b.weight - a.weight)
-      .slice(0, 5);
-  }, [auditData]);
-
-  const handleSort = (key: keyof typeof mockAuditData[0]) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
   const filteredAndSortedData = React.useMemo(() => {
     let data = [...auditData];
 
@@ -118,6 +80,12 @@ export const WastageReport = () => {
         const aVal = a[sortConfig.key!];
         const bVal = b[sortConfig.key!];
 
+        if (sortConfig.key === "weight" || sortConfig.key === "cost") {
+          const numA = Number(aVal) || 0;
+          const numB = Number(bVal) || 0;
+          return sortConfig.direction === "asc" ? numA - numB : numB - numA;
+        }
+
         if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -125,7 +93,45 @@ export const WastageReport = () => {
     }
 
     return data;
-  }, [searchText, cityFilter, sortConfig]);
+  }, [auditData, searchText, cityFilter, sortConfig]);
+
+  // Dynamic Pie Chart Data based on reasons in filteredAndSortedData
+  // Force exactly 3 categories: Expired, Human Error, Spoiled
+  const wastageStats = React.useMemo(() => {
+    const counts: Record<string, number> = { 'Kedaluwarsa': 0, 'Kelalaian Manusia': 0, 'Busuk': 0 };
+    filteredAndSortedData.forEach(item => {
+      let category = item.reason;
+      if (category === 'Damage' || category === 'Damage/Spoiled' || category === 'Spoiled' || category === 'Tumpah / Rusak') category = 'Busuk';
+      if (counts.hasOwnProperty(category)) {
+        counts[category]++;
+      }
+    });
+    const total = filteredAndSortedData.length;
+    return Object.entries(counts).map(([name, count]) => ({
+      name,
+      value: total > 0 ? Math.round((count / total) * 100) : 0
+    }));
+  }, [filteredAndSortedData]);
+
+  // Data for Bar Chart: Top 5 Wastage per Material based on filteredAndSortedData
+  const materialChartData = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredAndSortedData.forEach(item => {
+      counts[item.material] = (counts[item.material] || 0) + (Number(item.weight) || 0);
+    });
+    return Object.entries(counts)
+      .map(([name, weight]) => ({ name, weight: Number(weight.toFixed(2)) }))
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 5);
+  }, [filteredAndSortedData]);
+
+  const handleSort = (key: keyof typeof mockAuditData[0]) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   // Paginated Data
   const paginatedData = React.useMemo(() => {

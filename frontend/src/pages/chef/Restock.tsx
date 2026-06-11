@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { AnimatePresence } from "motion/react";
+import { useLocation } from "react-router-dom";
 
 // Haversine formula to calculate distance in km
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -53,6 +54,7 @@ interface ManualRequestItem {
 }
 
 export const Restock = ({ user }: { user: any }) => {
+  const location = useLocation();
   const [loading, setLoading] = React.useState(true);
   const [kitchenDetail, setKitchenDetail] = React.useState<any>(null);
   const [productionPlans, setProductionPlans] = React.useState<any[]>([]);
@@ -60,6 +62,40 @@ export const Restock = ({ user }: { user: any }) => {
   const [menus, setMenus] = React.useState<any[]>([]);
   const [stockRequests, setStockRequests] = React.useState<any[]>([]);
   const [inventory, setInventory] = React.useState<any[]>([]);
+  const [sourceNotificationId, setSourceNotificationId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (location.state && location.state.prefillShortages && inventory.length > 0) {
+      setActiveMethodTab("Manual");
+      if (location.state.notificationId) {
+        setSourceNotificationId(location.state.notificationId);
+      }
+      const shortages = location.state.prefillShortages as { material: string; amount: string }[];
+      const prefilledManualItems: ManualRequestItem[] = shortages.map(sh => {
+        const amountParts = sh.amount.split(/\s+/);
+        const qty = amountParts[0] || "";
+        const unit = amountParts[1] || "kg";
+        
+        const exists = inventory.some(invItem => invItem.name.toLowerCase() === sh.material.toLowerCase());
+        const matchedName = exists 
+          ? (inventory.find(invItem => invItem.name.toLowerCase() === sh.material.toLowerCase())?.name || sh.material)
+          : "custom";
+
+        return {
+          id: Math.random().toString(36).substr(2, 9),
+          materialSelect: matchedName,
+          customMaterial: exists ? "" : sh.material,
+          quantity: qty,
+          unitSelect: unit,
+          customUnit: "",
+          urgency: "High"
+        };
+      });
+      if (prefilledManualItems.length > 0) {
+        setManualItems(prefilledManualItems);
+      }
+    }
+  }, [location.state, inventory]);
   
   // Settings & Navigation
   const [maxDistance, setMaxDistance] = React.useState<number>(10);
@@ -90,6 +126,10 @@ export const Restock = ({ user }: { user: any }) => {
   
   // Success states
   const [successMsg, setSuccessMsg] = React.useState("");
+
+  // Tracking detail modal state
+  const [selectedTrackingRequest, setSelectedTrackingRequest] = React.useState<any>(null);
+  const [isTrackingDetailOpen, setTrackingDetailOpen] = React.useState(false);
 
   const loadAllData = React.useCallback(async () => {
     if (!user?.kitchenId) return;
@@ -406,6 +446,15 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
         supplierName
       );
 
+      if (sourceNotificationId) {
+        try {
+          await api.markNotificationRead(sourceNotificationId);
+          setSourceNotificationId(null);
+        } catch (err) {
+          console.error("Failed to mark notification read:", err);
+        }
+      }
+
       showNotification(`Sukses mengajukan restock ${material} sebanyak ${amount} ke ${supplierName}!`);
       setSelectedMaterial(null);
       const requests = await api.getStockRequests(user.kitchenId);
@@ -520,6 +569,16 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
       });
 
       await api.requestStockBatch(requests, user.kitchenId, kitchenDetail?.name);
+
+      if (sourceNotificationId) {
+        try {
+          await api.markNotificationRead(sourceNotificationId);
+          setSourceNotificationId(null);
+        } catch (err) {
+          console.error("Failed to mark notification read:", err);
+        }
+      }
+
       showNotification(`Sukses mengirimkan ${requests.length} pengajuan bahan ke Gudang Pusat!`);
       setManualItems([createEmptyManualItem()]);
       
@@ -1042,38 +1101,18 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-slate-100">
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse min-w-[750px]">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">ID Tiket</th>
+                  <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Dapur Peminta</th>
                   <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Bahan Baku</th>
                   <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Jumlah</th>
                   <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Urgensi</th>
-                  <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Dikirim Ke/Dari</th>
-                  <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Tanggal Pengajuan</th>
-                  <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
-                  <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Feedback / Catatan Admin</th>
+                  <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Tujuan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white/50 backdrop-blur-sm">
                 {stockRequests.map((req: any) => {
-                  let statusColor = "bg-slate-100 text-slate-500";
-                  let StatusIcon = Hourglass;
-                  
-                  if (req.status === "Approved") {
-                    statusColor = "bg-blue-50 text-blue-600 border border-blue-100/60";
-                    StatusIcon = Truck;
-                  } else if (req.status === "Delivered" || req.status === "Selesai") {
-                    statusColor = "bg-emerald-50 text-emerald-600 border border-emerald-100/60";
-                    StatusIcon = CheckCircle2;
-                  } else if (req.status === "Pending") {
-                    statusColor = "bg-amber-50 text-amber-600 border border-amber-100/60 shadow-sm animate-pulse";
-                    StatusIcon = Hourglass;
-                  } else if (req.status === "Denied" || req.status === "Rejected") {
-                    statusColor = "bg-red-50 text-red-650 border border-red-100/60";
-                    StatusIcon = AlertTriangle;
-                  }
-
                   const urgencyColor = req.urgency === "High" || req.urgency === "Kritis"
                     ? "text-red-700 bg-red-50 border border-red-100/60" 
                     : req.urgency === "Medium" || req.urgency === "Mendesak"
@@ -1083,17 +1122,22 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
                   const supplierDisplay = req.supplierKitchenName || "Gudang Pusat";
 
                   return (
-                    <tr key={req.id} className="hover:bg-slate-50/40 transition-colors border-l-2 border-l-transparent hover:border-l-primary">
-                      <td className="p-4">
-                        <span className="inline-block font-mono text-[11px] font-black text-slate-500 bg-slate-50 border border-slate-150 px-2.5 py-1 rounded-xl shadow-inner">
-                          #{req.id}
-                        </span>
-                      </td>
+                    <tr 
+                      key={req.id} 
+                      onClick={() => {
+                        setSelectedTrackingRequest(req);
+                        setTrackingDetailOpen(true);
+                      }}
+                      className="hover:bg-slate-50/40 transition-colors border-l-2 border-l-transparent hover:border-l-primary cursor-pointer"
+                    >
                       <td className="p-4 text-xs font-black text-slate-800 tracking-tight">
                         <div className="flex items-center gap-1.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                          <span>{req.material}</span>
+                          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                          <span>{req.kitchenName || kitchenDetail?.name}</span>
                         </div>
+                      </td>
+                      <td className="p-4 text-xs font-black text-slate-800 tracking-tight">
+                        <span>{req.material}</span>
                       </td>
                       <td className="p-4 text-xs font-extrabold text-slate-900 tracking-tight">{req.amount}</td>
                       <td className="p-4">
@@ -1102,53 +1146,6 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
                         </span>
                       </td>
                       <td className="p-4 text-xs font-bold text-slate-650 tracking-tight">{supplierDisplay}</td>
-                      <td className="p-4 text-xs text-slate-500 font-medium">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-700">
-                            {new Date(req.createdAt).toLocaleDateString("id-ID", {
-                              day: "numeric",
-                              month: "short"
-                            })}
-                          </span>
-                          <span className="text-[10px] text-slate-400 mt-0.5">
-                            {new Date(req.createdAt).toLocaleTimeString("id-ID", {
-                              hour: "2-digit",
-                              minute: "2-digit"
-                            })} WIB
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider", statusColor)}>
-                          <StatusIcon className="w-3.5 h-3.5" />
-                          <span>
-                            {req.status === "Pending" 
-                              ? "Menunggu" 
-                              : req.status === "Approved" 
-                              ? "Disetujui" 
-                              : req.status === "Denied" || req.status === "Rejected"
-                              ? "Ditolak"
-                              : "Selesai"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-xs">
-                        {req.adminNotes ? (
-                          <div className={cn(
-                            "px-3 py-2 rounded-xl text-xs font-medium max-w-[250px] leading-relaxed border shadow-sm",
-                            req.status === "Pending" 
-                              ? "bg-amber-50 text-amber-800 border-amber-100" 
-                              : req.status === "Denied" || req.status === "Rejected"
-                              ? "bg-red-50 text-red-800 border-red-100"
-                              : "bg-slate-50 text-slate-600 border-slate-100"
-                          )}>
-                            <span className="font-black block uppercase text-[8px] tracking-wider mb-0.5">Catatan Admin:</span>
-                            {req.adminNotes}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic text-[11px] px-1">-</span>
-                        )}
-                      </td>
                     </tr>
                   );
                 })}
@@ -1157,6 +1154,119 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
           </div>
         )}
       </Card>
+
+      {/* Tracking Request Detail Modal */}
+      <AnimatePresence>
+        {isTrackingDetailOpen && selectedTrackingRequest && (
+          <Modal
+            isOpen={isTrackingDetailOpen}
+            onClose={() => {
+              setTrackingDetailOpen(false);
+              setSelectedTrackingRequest(null);
+            }}
+            title={`Detail Permintaan Stock: #${selectedTrackingRequest.id}`}
+          >
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-bold text-slate-700">
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Dapur Peminta</span>
+                  <span className="text-slate-800 font-extrabold">{selectedTrackingRequest.kitchenName || kitchenDetail?.name}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Tujuan / Supplier</span>
+                  <span className="text-slate-800 font-extrabold">{selectedTrackingRequest.supplierKitchenName || "Gudang Pusat"}</span>
+                </div>
+                <div className="mt-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Bahan Baku</span>
+                  <span className="text-primary font-black">{selectedTrackingRequest.material}</span>
+                </div>
+                <div className="mt-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Jumlah</span>
+                  <span className="text-slate-900 font-black">{selectedTrackingRequest.amount}</span>
+                </div>
+                <div className="mt-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Urgensi</span>
+                  <div>
+                    <span className={cn(
+                      "px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider inline-block",
+                      selectedTrackingRequest.urgency === "High" || selectedTrackingRequest.urgency === "Kritis"
+                        ? "text-red-700 bg-red-50 border border-red-100/60" 
+                        : selectedTrackingRequest.urgency === "Medium" || selectedTrackingRequest.urgency === "Mendesak"
+                        ? "text-amber-700 bg-amber-50 border border-amber-100/60"
+                        : "text-slate-600 bg-slate-50 border border-slate-100/60"
+                    )}>
+                      {selectedTrackingRequest.urgency}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Status</span>
+                  <div>
+                    <span className={cn(
+                      "px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider inline-block border",
+                      selectedTrackingRequest.status === "Approved"
+                        ? "bg-blue-50 text-blue-600 border-blue-100/60"
+                        : selectedTrackingRequest.status === "Delivered" || selectedTrackingRequest.status === "Selesai"
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-100/60"
+                        : selectedTrackingRequest.status === "Pending"
+                        ? "bg-amber-50 text-amber-600 border-amber-100/60 shadow-sm"
+                        : "bg-red-50 text-red-650 border-red-100/60"
+                    )}>
+                      {selectedTrackingRequest.status === "Pending" 
+                        ? "Menunggu" 
+                        : selectedTrackingRequest.status === "Approved" 
+                        ? "Disetujui" 
+                        : selectedTrackingRequest.status === "Denied" || selectedTrackingRequest.status === "Rejected"
+                        ? "Ditolak"
+                        : "Selesai"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-bold text-slate-700">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 font-mono">Tanggal Pengajuan</span>
+                <span className="text-slate-800">
+                  {new Date(selectedTrackingRequest.createdAt).toLocaleDateString("id-ID", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric"
+                  })}{" "}
+                  pukul{" "}
+                  {new Date(selectedTrackingRequest.createdAt).toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })}{" "}
+                  WIB
+                </span>
+              </div>
+
+              <div className="bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-medium">
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 font-mono">Catatan Admin / Feedback:</span>
+                {selectedTrackingRequest.adminNotes ? (
+                  <p className="text-slate-700 font-bold leading-relaxed">{selectedTrackingRequest.adminNotes}</p>
+                ) : (
+                  <p className="text-slate-400 italic">Tidak ada catatan feedback.</p>
+                )}
+              </div>
+              
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setTrackingDetailOpen(false);
+                    setSelectedTrackingRequest(null);
+                  }}
+                  className="w-full py-3.5 font-black uppercase text-[10px] tracking-widest bg-slate-800 hover:bg-slate-900 text-white rounded-xl shadow-md cursor-pointer"
+                >
+                  Tutup
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
 
     </div>
   );

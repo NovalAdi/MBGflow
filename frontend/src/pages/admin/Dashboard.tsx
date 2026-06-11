@@ -103,66 +103,6 @@ export const AdminDashboard = () => {
         ))}
       </div>
 
-      {/* Analytics & Performance section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Chart Card */}
-        <Card className="lg:col-span-2 p-8 border-none rounded-[32px] bg-white shadow-sm flex flex-col gap-6">
-          <div>
-            <h3 className="font-extrabold text-xl text-slate-800 tracking-tight">Realisasi Target Produksi</h3>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">Komparasi Target vs Realisasi Porsi Selesai Hari Ini (Per Jam)</p>
-          </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockProgressData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10, fontWeight: 'bold' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10, fontWeight: 'bold' }} />
-                <Tooltip 
-                  cursor={{ fill: '#F8FAFC' }}
-                  contentStyle={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }}
-                />
-                <Bar name="Target" dataKey="target" fill="#94A3B8" stroke="#94A3B8" strokeWidth={1} radius={[6, 6, 0, 0]} />
-                <Bar name="Realisasi" dataKey="real" fill="#15803D" stroke="#15803D" strokeWidth={1} radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        {/* Insights Card */}
-        <Card className="p-8 border-none rounded-[32px] bg-white shadow-sm flex flex-col justify-between">
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-extrabold text-xl text-slate-800 tracking-tight">Status Dapur Pusat</h3>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">Ringkasan Beban & Utilisasi</p>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="p-4 bg-slate-50/50 rounded-2xl flex items-center justify-between border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Dapur Pusat Jakarta</span>
-                <span className="px-2.5 py-1 text-[8px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 rounded-full">Optimal</span>
-              </div>
-              <div className="p-4 bg-slate-50/50 rounded-2xl flex items-center justify-between border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Dapur Satelit Tangerang</span>
-                <span className="px-2.5 py-1 text-[8px] font-black uppercase tracking-widest bg-amber-50 text-amber-600 rounded-full">Kapasitas Tinggi</span>
-              </div>
-              <div className="p-4 bg-slate-50/50 rounded-2xl flex items-center justify-between border border-slate-100">
-                <span className="text-xs font-bold text-slate-600">Dapur Depok Cloud</span>
-                <span className="px-2.5 py-1 text-[8px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 rounded-full">Senggang</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-50 mt-4">
-            <button 
-              className="w-full py-4 bg-slate-50 hover:bg-primary hover:text-white text-slate-700 font-bold text-xs uppercase tracking-widest rounded-2xl transition-all cursor-pointer"
-              onClick={() => navigate("/admin/kitchens")}
-            >
-              Lihat Detail Semua Dapur
-            </button>
-          </div>
-        </Card>
-      </div>
-
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
