@@ -466,6 +466,44 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
     }
   };
 
+  // Send all AI predicted shortages to central warehouse
+  const handleSendAIPredictions = async () => {
+    if (predictions.length === 0 || submittingRequest) return;
+    setSubmittingRequest(true);
+    try {
+      const centralKitchen = inventory.length > 0 ? "Dapur Pusat Jakarta" : "Gudang Pusat";
+      const requests = predictions.map(item => {
+        return {
+          material: item.material,
+          amount: item.recommendedAmount,
+          urgency: item.urgency || "Medium",
+          supplierKitchenId: "k1",
+          supplierKitchenName: centralKitchen
+        };
+      });
+
+      await api.requestStockBatch(requests, user.kitchenId, kitchenDetail?.name);
+
+      if (sourceNotificationId) {
+        try {
+          await api.markNotificationRead(sourceNotificationId);
+          setSourceNotificationId(null);
+        } catch (err) {
+          console.error("Failed to mark notification read:", err);
+        }
+      }
+
+      showNotification(`Sukses mengirimkan ${requests.length} pengajuan bahan hasil prediksi AI ke Gudang Pusat!`);
+      
+      const reqList = await api.getStockRequests(user.kitchenId);
+      setStockRequests(reqList);
+    } catch (err: any) {
+      alert(err.message || "Gagal mengirimkan pengajuan.");
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
   // Manual Form Handlers
   const addManualItem = () => {
     setManualItems([...manualItems, createEmptyManualItem()]);
@@ -662,7 +700,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
             activeMethodTab === "AI" ? "text-primary" : "text-slate-500 hover:text-slate-700"
           )}
         >
-          Metode A: Prediksi AI Gemini
+          Prediksi AI
           {activeMethodTab === "AI" && (
             <div className="absolute bottom-[-2px] left-0 right-0 h-1 bg-primary rounded-full shadow-md" />
           )}
@@ -674,7 +712,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
             activeMethodTab === "Manual" ? "text-primary" : "text-slate-500 hover:text-slate-700"
           )}
         >
-          Metode B: Form Input Manual
+          Form Input Manual
           {activeMethodTab === "Manual" && (
             <div className="absolute bottom-[-2px] left-0 right-0 h-1 bg-primary rounded-full shadow-md" />
           )}
@@ -730,9 +768,19 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
 
             {!predicting && predictions.length > 0 && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100 w-fit">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>Ditemukan {predictions.length} bahan baku yang diprediksi kurang untuk rencana masak mendatang.</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100 w-fit">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Ditemukan {predictions.length} bahan baku yang diprediksi kurang untuk rencana masak mendatang.</span>
+                  </div>
+                  <Button
+                    onClick={handleSendAIPredictions}
+                    disabled={submittingRequest}
+                    className="w-full sm:w-auto px-6 py-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-70 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Kirim Semua ke Gudang Pusat
+                  </Button>
                 </div>
 
                 <div className="overflow-x-auto rounded-2xl border border-slate-100">

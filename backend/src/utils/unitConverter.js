@@ -67,33 +67,34 @@ function aggregateStock(itemBatches) {
   let hasVolumes = false;
   
   for (const b of itemBatches) {
-    const val = Number(b.weight_value) || 0;
+    const qtyPacked = Number(b.qty_packed) || 0;
+    const qtyLoose = Number(b.qty_loose) || 0;
+    
     const u = (b.unit || 'kg').trim();
     const uLower = u.toLowerCase();
     
     const cap = Number(b.package_capacity);
     const pkgUnit = (b.package_unit || '').trim().toLowerCase();
     
+    // Calculate total weight/volume for this batch
+    let val = 0;
     if (!isNaN(cap) && cap > 0 && pkgUnit) {
-      const totalPkgVal = val * cap;
-      if (pkgUnit === 'kg' || pkgUnit === 'g') {
-        hasWeights = true;
-        weightSumKg += pkgUnit === 'g' ? totalPkgVal / 1000 : totalPkgVal;
-      } else if (pkgUnit === 'l' || pkgUnit === 'ml') {
-        hasVolumes = true;
-        volumeSumL += pkgUnit === 'ml' ? totalPkgVal / 1000 : totalPkgVal;
-      }
+      val = (qtyPacked * cap) + qtyLoose;
     } else {
-      if (uLower === 'kg' || uLower === 'g') {
-        hasWeights = true;
-        weightSumKg += uLower === 'g' ? val / 1000 : val;
-      } else if (uLower === 'l' || uLower === 'ml') {
-        hasVolumes = true;
-        volumeSumL += uLower === 'ml' ? val / 1000 : val;
-      } else {
-        hasWeights = true;
-        weightSumKg += val;
-      }
+      val = qtyLoose || Number(b.weight_value) || 0;
+    }
+    
+    const targetUnit = pkgUnit || uLower;
+    
+    if (targetUnit === 'kg' || targetUnit === 'g') {
+      hasWeights = true;
+      weightSumKg += targetUnit === 'g' ? val / 1000 : val;
+    } else if (targetUnit === 'l' || targetUnit === 'ml') {
+      hasVolumes = true;
+      volumeSumL += targetUnit === 'ml' ? val / 1000 : val;
+    } else {
+      hasWeights = true;
+      weightSumKg += val;
     }
   }
   

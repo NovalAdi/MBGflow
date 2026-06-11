@@ -118,15 +118,21 @@ async function getKitchenDetail(req, res) {
       if (dbBatches.length === 0) return null;
 
       const itemBatches = dbBatches.map(b => {
-        const formattedWeight = formatSingleBatch(b.weight_value, b.unit, b.package_capacity, b.package_unit);
+        const qtyPacked = Number(b.qty_packed) || 0;
+        const qtyLoose = Number(b.qty_loose) || 0;
+        const cap = b.package_capacity !== null ? Number(b.package_capacity) : null;
+        const totalVal = (cap !== null && cap > 0) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
+        const formattedWeight = formatSingleBatch(qtyPacked, qtyLoose, b.container, cap, b.package_unit);
         return {
           id: b.id,
           kitchenId: b.kitchenId,
           container: b.container,
-          weight_value: Number(b.weight_value),
+          qty_packed: qtyPacked,
+          qty_loose: qtyLoose,
+          weight_value: totalVal,
           unit: b.unit,
           weight: formattedWeight,
-          package_capacity: b.package_capacity !== null ? Number(b.package_capacity) : null,
+          package_capacity: cap,
           package_unit: b.package_unit,
           expiry: b.expiry ? b.expiry.toISOString().split('T')[0] : ''
         };
@@ -137,6 +143,11 @@ async function getKitchenDetail(req, res) {
       return {
         id: item.id,
         name: item.name,
+        logistics_sku: item.logistics_sku,
+        base_unit: item.base_unit,
+        has_packaging: item.has_packaging,
+        packaging_name: item.packaging_name,
+        packaging_capacity: item.packaging_capacity !== null ? Number(item.packaging_capacity) : null,
         volume: volume,
         totalWeight: totalWeight,
         batches: itemBatches

@@ -115,7 +115,7 @@ export const ChefStock = ({ user }: { user: any }) => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase">
-                  Jumlah Dibuang ({selectedBatch?.weight ? selectedBatch.weight.replace(/[0-9.\s]+/g, '') : ''})
+                  Jumlah Dibuang ({selectedBatch?.package_unit || selectedBatch?.unit || 'kg'})
                 </label>
                 <input 
                   type="number" 

@@ -12,15 +12,21 @@ async function getInventory(req, res) {
 
     const formattedInventory = items.map(item => {
       const itemBatches = batches.filter(b => b.inventoryId === item.id).map(b => {
-        const formattedWeight = formatSingleBatch(b.weight_value, b.unit, b.package_capacity, b.package_unit);
+        const qtyPacked = Number(b.qty_packed) || 0;
+        const qtyLoose = Number(b.qty_loose) || 0;
+        const cap = b.package_capacity !== null ? Number(b.package_capacity) : null;
+        const totalVal = (cap !== null && cap > 0) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
+        const formattedWeight = formatSingleBatch(qtyPacked, qtyLoose, b.container, cap, b.package_unit);
         return {
           id: b.id,
           kitchenId: b.kitchenId,
           container: b.container,
-          weight_value: Number(b.weight_value),
+          qty_packed: qtyPacked,
+          qty_loose: qtyLoose,
+          weight_value: totalVal,
           unit: b.unit,
           weight: formattedWeight,
-          package_capacity: b.package_capacity !== null ? Number(b.package_capacity) : null,
+          package_capacity: cap,
           package_unit: b.package_unit,
           expiry: b.expiry ? b.expiry.toISOString().split('T')[0] : ''
         };
@@ -28,6 +34,11 @@ async function getInventory(req, res) {
       return {
         id: item.id,
         name: item.name,
+        logistics_sku: item.logistics_sku,
+        base_unit: item.base_unit,
+        has_packaging: item.has_packaging,
+        packaging_name: item.packaging_name,
+        packaging_capacity: item.packaging_capacity !== null ? Number(item.packaging_capacity) : null,
         batches: itemBatches
       };
     });
@@ -137,25 +148,37 @@ async function reportWastage(req, res) {
     );
 
     let displayUnit = 'kg';
-    let newWeightValue = 0;
+    let newQtyPacked = 0;
+    let newQtyLoose = 0;
     let standardQty = Number(weight);
 
     if (batches.length > 0) {
       const batch = batches[0];
-      const currentWeightValue = Number(batch.weight_value) || 0;
+      const qtyPacked = Number(batch.qty_packed) || 0;
+      const qtyLoose = Number(batch.qty_loose) || 0;
       const dbUnit = batch.unit || 'kg';
       const cap = Number(batch.package_capacity);
       const pkgUnit = (batch.package_unit || '').trim();
       
-      displayUnit = getDisplayUnit(currentWeightValue, dbUnit, cap, pkgUnit);
-      const discardedInDbUnit = convertUnit(Number(weight), displayUnit, dbUnit, cap, pkgUnit);
+      const currentTotal = (!isNaN(cap) && cap > 0) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
+      displayUnit = getDisplayUnit(currentTotal, dbUnit, cap, pkgUnit);
       
-      newWeightValue = Math.max(0, currentWeightValue - discardedInDbUnit);
-      const formattedWeight = formatSingleBatch(newWeightValue, dbUnit, cap, pkgUnit);
+      const discardedInStandardUnit = convertUnit(Number(weight), displayUnit, pkgUnit || dbUnit, cap, pkgUnit);
+      const newTotal = Math.max(0, currentTotal - discardedInStandardUnit);
+      
+      if (!isNaN(cap) && cap > 0) {
+        newQtyPacked = Math.floor(newTotal / cap);
+        newQtyLoose = Number((newTotal % cap).toFixed(4));
+      } else {
+        newQtyPacked = 0;
+        newQtyLoose = Number(newTotal.toFixed(4));
+      }
+      
+      const formattedWeight = formatSingleBatch(newQtyPacked, newQtyLoose, batch.container, cap, pkgUnit);
       
       await connection.query(
-        'UPDATE inventory_batches SET weight_value = ?, weight = ? WHERE id = ?',
-        [newWeightValue, formattedWeight, batchId]
+        'UPDATE inventory_batches SET qty_packed = ?, qty_loose = ?, weight = ? WHERE id = ?',
+        [newQtyPacked, newQtyLoose, formattedWeight, batchId]
       );
 
       if (!isNaN(cap) && cap > 0 && pkgUnit) {
@@ -268,7 +291,10 @@ async function getChefDashboardData(req, res) {
       const diffTime = expiryDate - now;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
-      const val = Number(b.weight_value) || 0;
+      const qtyPacked = Number(b.qty_packed) || 0;
+      const qtyLoose = Number(b.qty_loose) || 0;
+      const cap = Number(b.package_capacity);
+      const val = (!isNaN(cap) && cap > 0) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
       const isLow = val <= 2;
       const isExpiringSoon = diffDays <= 30;
       
@@ -277,9 +303,11 @@ async function getChefDashboardData(req, res) {
           id: b.id,
           material: b.materialName,
           container: b.container,
+          qty_packed: qtyPacked,
+          qty_loose: qtyLoose,
           weight_value: val,
           unit: b.unit,
-          weight: formatSingleBatch(b.weight_value, b.unit, b.package_capacity, b.package_unit),
+          weight: formatSingleBatch(qtyPacked, qtyLoose, b.container, cap, b.package_unit),
           package_capacity: b.package_capacity !== null ? Number(b.package_capacity) : null,
           package_unit: b.package_unit,
           expiry: b.expiry ? b.expiry.toISOString().split('T')[0] : '',
@@ -346,6 +374,11 @@ async function getMaterialAvailability(req, res) {
     
     const aggregated = {};
     for (const b of batches) {
+      const qtyPacked = Number(b.qty_packed) || 0;
+      const qtyLoose = Number(b.qty_loose) || 0;
+      const cap = Number(b.package_capacity);
+      const val = (!isNaN(cap) && cap > 0) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
+
       if (!aggregated[b.kitchenId]) {
         aggregated[b.kitchenId] = {
           kitchenId: b.kitchenId,
@@ -360,13 +393,14 @@ async function getMaterialAvailability(req, res) {
           batches: []
         };
       }
-      aggregated[b.kitchenId].totalWeightValue += Number(b.weight_value);
+      aggregated[b.kitchenId].totalWeightValue += val;
       
-      const formattedWeight = formatSingleBatch(b.weight_value, b.unit, b.package_capacity, b.package_unit);
+      const formattedWeight = formatSingleBatch(qtyPacked, qtyLoose, b.container, cap, b.package_unit);
       aggregated[b.kitchenId].batches.push({
         id: b.id,
         container: b.container,
-        weight_value: Number(b.weight_value),
+        qty_packed: qtyPacked,
+        qty_loose: qtyLoose,
         unit: b.unit,
         weight: formattedWeight,
         expiry: b.expiry ? b.expiry.toISOString().split('T')[0] : ''
@@ -377,7 +411,8 @@ async function getMaterialAvailability(req, res) {
       const baseUnit = k.unit || 'kg';
       const cap = Number(k.package_capacity);
       const pkgUnit = k.package_unit || '';
-      const formattedTotal = formatSingleBatch(k.totalWeightValue, baseUnit, cap, pkgUnit);
+      // pass total as qty_loose (packed = 0) to formattedTotal
+      const formattedTotal = formatSingleBatch(0, k.totalWeightValue, baseUnit, cap, pkgUnit);
       return {
         ...k,
         totalWeight: formattedTotal

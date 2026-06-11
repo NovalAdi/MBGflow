@@ -115,7 +115,12 @@ async function createTables() {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS inventory (
         id VARCHAR(50) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL UNIQUE
+        name VARCHAR(255) NOT NULL UNIQUE,
+        logistics_sku VARCHAR(100) NULL,
+        base_unit VARCHAR(20) NOT NULL DEFAULT 'kg',
+        has_packaging TINYINT(1) DEFAULT 0,
+        packaging_name VARCHAR(50) NULL,
+        packaging_capacity DECIMAL(10, 4) NULL
       );
     `);
 
@@ -127,7 +132,8 @@ async function createTables() {
         kitchenId VARCHAR(50) NOT NULL,
         container VARCHAR(255),
         weight VARCHAR(50) NOT NULL,
-        weight_value DECIMAL(10, 4) NOT NULL DEFAULT 0.0000,
+        qty_packed INT NOT NULL DEFAULT 0,
+        qty_loose DECIMAL(10, 4) NOT NULL DEFAULT 0.0000,
         unit VARCHAR(50) NOT NULL DEFAULT 'kg',
         package_capacity DECIMAL(10, 4) NULL,
         package_unit VARCHAR(50) NULL,
@@ -333,92 +339,92 @@ async function seedDatabase() {
     // =========================================================================
     const inventory = [
       {
-        id: 'mat-1', name: 'Ayam Negri',
+        id: 'mat-1', name: 'Ayam Negri', logistics_sku: 'SKU-AYM-01', base_unit: 'kg', has_packaging: 1, packaging_name: 'Karton', packaging_capacity: 25,
         batches: [
-          { id: 'b1', kitchenId: 'k1', container: 'Karton', weight_value: 6, unit: 'karton', weight: '6 karton', expiry: '2025-08-10', package_capacity: 25, package_unit: 'kg' },
-          { id: 'b2', kitchenId: 'k1', container: 'Box', weight_value: 10, unit: 'box', weight: '10 box', expiry: '2025-08-12', package_capacity: 20, package_unit: 'kg' },
-          { id: 'b2a', kitchenId: 'k2', container: 'Karton', weight_value: 8, unit: 'karton', weight: '8 karton', expiry: '2025-08-15', package_capacity: 25, package_unit: 'kg' },
-          { id: 'b2b', kitchenId: 'k3', container: 'Karton', weight_value: 5, unit: 'karton', weight: '5 karton', expiry: '2025-07-20', package_capacity: 25, package_unit: 'kg' },
+          { id: 'b1', kitchenId: 'k1', container: 'Karton', qty_packed: 6, qty_loose: 0.0, unit: 'karton', weight: '6 karton', expiry: '2025-08-10', package_capacity: 25, package_unit: 'kg' },
+          { id: 'b2', kitchenId: 'k1', container: 'Box', qty_packed: 10, qty_loose: 0.0, unit: 'box', weight: '10 box', expiry: '2025-08-12', package_capacity: 20, package_unit: 'kg' },
+          { id: 'b2a', kitchenId: 'k2', container: 'Karton', qty_packed: 8, qty_loose: 0.0, unit: 'karton', weight: '8 karton', expiry: '2025-08-15', package_capacity: 25, package_unit: 'kg' },
+          { id: 'b2b', kitchenId: 'k3', container: 'Karton', qty_packed: 5, qty_loose: 0.0, unit: 'karton', weight: '5 karton', expiry: '2025-07-20', package_capacity: 25, package_unit: 'kg' },
         ],
       },
       {
-        id: 'mat-2', name: 'Minyak Goreng',
+        id: 'mat-2', name: 'Minyak Goreng', logistics_sku: 'SKU-MNG-02', base_unit: 'L', has_packaging: 1, packaging_name: 'Jerigen', packaging_capacity: 20,
         batches: [
-          { id: 'b3', kitchenId: 'k1', container: 'Jerigen', weight_value: 5, unit: 'jerigen', weight: '5 jerigen', expiry: '2025-12-10', package_capacity: 20, package_unit: 'L' },
-          { id: 'b4', kitchenId: 'k2', container: 'Jerigen', weight_value: 4, unit: 'jerigen', weight: '4 jerigen', expiry: '2025-12-15', package_capacity: 20, package_unit: 'L' },
-          { id: 'b5', kitchenId: 'k3', container: 'Jerigen', weight_value: 6, unit: 'jerigen', weight: '6 jerigen', expiry: '2025-12-20', package_capacity: 20, package_unit: 'L' },
+          { id: 'b3', kitchenId: 'k1', container: 'Jerigen', qty_packed: 5, qty_loose: 0.0, unit: 'jerigen', weight: '5 jerigen', expiry: '2025-12-10', package_capacity: 20, package_unit: 'L' },
+          { id: 'b4', kitchenId: 'k2', container: 'Jerigen', qty_packed: 4, qty_loose: 0.0, unit: 'jerigen', weight: '4 jerigen', expiry: '2025-12-15', package_capacity: 20, package_unit: 'L' },
+          { id: 'b5', kitchenId: 'k3', container: 'Jerigen', qty_packed: 6, qty_loose: 0.0, unit: 'jerigen', weight: '6 jerigen', expiry: '2025-12-20', package_capacity: 20, package_unit: 'L' },
         ],
       },
       {
-        id: 'mat-3', name: 'Bumbu Kuning',
+        id: 'mat-3', name: 'Bumbu Kuning', logistics_sku: 'SKU-BMK-03', base_unit: 'kg', has_packaging: 1, packaging_name: 'Box', packaging_capacity: 10,
         batches: [
-          { id: 'b6', kitchenId: 'k1', container: 'Box', weight_value: 4, unit: 'box', weight: '4 box', expiry: '2025-07-01', package_capacity: 10, package_unit: 'kg' },
-          { id: 'b6a', kitchenId: 'k3', container: 'Box', weight_value: 2, unit: 'box', weight: '2 box', expiry: '2025-07-10', package_capacity: 10, package_unit: 'kg' },
+          { id: 'b6', kitchenId: 'k1', container: 'Box', qty_packed: 4, qty_loose: 0.0, unit: 'box', weight: '4 box', expiry: '2025-07-01', package_capacity: 10, package_unit: 'kg' },
+          { id: 'b6a', kitchenId: 'k3', container: 'Box', qty_packed: 2, qty_loose: 0.0, unit: 'box', weight: '2 box', expiry: '2025-07-10', package_capacity: 10, package_unit: 'kg' },
         ],
       },
       {
-        id: 'mat-4', name: 'Kecap Manis',
+        id: 'mat-4', name: 'Kecap Manis', logistics_sku: 'SKU-KCP-04', base_unit: 'L', has_packaging: 1, packaging_name: 'Jerigen', packaging_capacity: 5,
         batches: [
-          { id: 'b7', kitchenId: 'k1', container: 'Jerigen', weight_value: 3, unit: 'jerigen', weight: '3 jerigen', expiry: '2026-01-01', package_capacity: 5, package_unit: 'L' },
-          { id: 'b7_refill', kitchenId: 'k1', container: 'Kemasan Refill', weight_value: 10, unit: 'kemasan refill', weight: '10 kemasan refill', expiry: '2026-01-05', package_capacity: 1, package_unit: 'L' },
-          { id: 'b8', kitchenId: 'k2', container: 'Jerigen', weight_value: 2, unit: 'jerigen', weight: '2 jerigen', expiry: '2025-11-20', package_capacity: 20, package_unit: 'L' },
+          { id: 'b7', kitchenId: 'k1', container: 'Jerigen', qty_packed: 3, qty_loose: 0.0, unit: 'jerigen', weight: '3 jerigen', expiry: '2026-01-01', package_capacity: 5, package_unit: 'L' },
+          { id: 'b7_refill', kitchenId: 'k1', container: 'Kemasan Refill', qty_packed: 10, qty_loose: 0.0, unit: 'kemasan refill', weight: '10 kemasan refill', expiry: '2026-01-05', package_capacity: 1, package_unit: 'L' },
+          { id: 'b8', kitchenId: 'k2', container: 'Jerigen', qty_packed: 2, qty_loose: 0.0, unit: 'jerigen', weight: '2 jerigen', expiry: '2025-11-20', package_capacity: 20, package_unit: 'L' },
         ],
       },
       {
-        id: 'mat-5', name: 'Ikan Gurame',
+        id: 'mat-5', name: 'Ikan Gurame', logistics_sku: 'SKU-IKN-05', base_unit: 'kg', has_packaging: 1, packaging_name: 'Karton', packaging_capacity: 25,
         batches: [
-          { id: 'b9', kitchenId: 'k2', container: 'Karton', weight_value: 12, unit: 'karton', weight: '12 karton', expiry: '2025-07-15', package_capacity: 25, package_unit: 'kg' },
-          { id: 'b9a', kitchenId: 'k3', container: 'Karton', weight_value: 4, unit: 'karton', weight: '4 karton', expiry: '2025-07-25', package_capacity: 25, package_unit: 'kg' },
+          { id: 'b9', kitchenId: 'k2', container: 'Karton', qty_packed: 12, qty_loose: 0.0, unit: 'karton', weight: '12 karton', expiry: '2025-07-15', package_capacity: 25, package_unit: 'kg' },
+          { id: 'b9a', kitchenId: 'k3', container: 'Karton', qty_packed: 4, qty_loose: 0.0, unit: 'karton', weight: '4 karton', expiry: '2025-07-25', package_capacity: 25, package_unit: 'kg' },
         ],
       },
       {
-        id: 'mat-6', name: 'Bumbu Ikan',
+        id: 'mat-6', name: 'Bumbu Ikan', logistics_sku: 'SKU-BMI-06', base_unit: 'kg', has_packaging: 1, packaging_name: 'Box', packaging_capacity: 10,
         batches: [
-          { id: 'b10', kitchenId: 'k2', container: 'Box', weight_value: 3, unit: 'box', weight: '3 box', expiry: '2025-08-10', package_capacity: 10, package_unit: 'kg' },
+          { id: 'b10', kitchenId: 'k2', container: 'Box', qty_packed: 3, qty_loose: 0.0, unit: 'box', weight: '3 box', expiry: '2025-08-10', package_capacity: 10, package_unit: 'kg' },
         ],
       },
       {
-        id: 'mat-7', name: 'Sambal Kecap',
+        id: 'mat-7', name: 'Sambal Kecap', logistics_sku: 'SKU-SBC-07', base_unit: 'kg', has_packaging: 1, packaging_name: 'Box', packaging_capacity: 10,
         batches: [
-          { id: 'b11', kitchenId: 'k2', container: 'Box', weight_value: 2, unit: 'box', weight: '2 box', expiry: '2025-07-30', package_capacity: 10, package_unit: 'kg' },
+          { id: 'b11', kitchenId: 'k2', container: 'Box', qty_packed: 2, qty_loose: 0.0, unit: 'box', weight: '2 box', expiry: '2025-07-30', package_capacity: 10, package_unit: 'kg' },
         ],
       },
       {
-        id: 'mat-8', name: 'Daging Bebek',
+        id: 'mat-8', name: 'Daging Bebek', logistics_sku: 'SKU-BBK-08', base_unit: 'kg', has_packaging: 1, packaging_name: 'Karton', packaging_capacity: 25,
         batches: [
-          { id: 'b12', kitchenId: 'k3', container: 'Karton', weight_value: 16, unit: 'karton', weight: '16 karton', expiry: '2025-07-18', package_capacity: 25, package_unit: 'kg' },
+          { id: 'b12', kitchenId: 'k3', container: 'Karton', qty_packed: 16, qty_loose: 0.0, unit: 'karton', weight: '16 karton', expiry: '2025-07-18', package_capacity: 25, package_unit: 'kg' },
         ],
       },
       {
-        id: 'mat-9', name: 'Bumbu Bebek',
+        id: 'mat-9', name: 'Bumbu Bebek', logistics_sku: 'SKU-BMB-09', base_unit: 'kg', has_packaging: 1, packaging_name: 'Box', packaging_capacity: 10,
         batches: [
-          { id: 'b13', kitchenId: 'k3', container: 'Box', weight_value: 5, unit: 'box', weight: '5 box', expiry: '2025-09-01', package_capacity: 10, package_unit: 'kg' },
+          { id: 'b13', kitchenId: 'k3', container: 'Box', qty_packed: 5, qty_loose: 0.0, unit: 'box', weight: '5 box', expiry: '2025-09-01', package_capacity: 10, package_unit: 'kg' },
         ],
       },
       {
-        id: 'mat-10', name: 'Madu & Kecap',
+        id: 'mat-10', name: 'Madu & Kecap', logistics_sku: 'SKU-MNK-10', base_unit: 'L', has_packaging: 1, packaging_name: 'Box', packaging_capacity: 10,
         batches: [
-          { id: 'b14', kitchenId: 'k3', container: 'Box', weight_value: 4, unit: 'box', weight: '4 box', expiry: '2025-10-15', package_capacity: 10, package_unit: 'L' },
+          { id: 'b14', kitchenId: 'k3', container: 'Box', qty_packed: 4, qty_loose: 0.0, unit: 'box', weight: '4 box', expiry: '2025-10-15', package_capacity: 10, package_unit: 'L' },
         ],
       },
       {
-        id: 'mat-11', name: 'Bumbu Bakar',
+        id: 'mat-11', name: 'Bumbu Bakar', logistics_sku: 'SKU-BBB-11', base_unit: 'kg', has_packaging: 1, packaging_name: 'Box', packaging_capacity: 10,
         batches: [
-          { id: 'b15', kitchenId: 'k1', container: 'Box', weight_value: 2, unit: 'box', weight: '2 box', expiry: '2025-08-20', package_capacity: 10, package_unit: 'kg' },
-          { id: 'b15a', kitchenId: 'k3', container: 'Box', weight_value: 3, unit: 'box', weight: '3 box', expiry: '2025-08-20', package_capacity: 10, package_unit: 'kg' },
+          { id: 'b15', kitchenId: 'k1', container: 'Box', qty_packed: 2, qty_loose: 0.0, unit: 'box', weight: '2 box', expiry: '2025-08-20', package_capacity: 10, package_unit: 'kg' },
+          { id: 'b15a', kitchenId: 'k3', container: 'Box', qty_packed: 3, qty_loose: 0.0, unit: 'box', weight: '3 box', expiry: '2025-08-20', package_capacity: 10, package_unit: 'kg' },
         ],
       },
     ];
     let batchCount = 0;
     for (const item of inventory) {
       await connection.query(
-        'INSERT INTO inventory (id, name) VALUES (?, ?)',
-        [item.id, item.name]
+        'INSERT INTO inventory (id, name, logistics_sku, base_unit, has_packaging, packaging_name, packaging_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [item.id, item.name, item.logistics_sku, item.base_unit, item.has_packaging, item.packaging_name, item.packaging_capacity]
       );
       for (const batch of item.batches) {
         await connection.query(
-          'INSERT INTO inventory_batches (id, inventoryId, kitchenId, container, weight, weight_value, unit, expiry, package_capacity, package_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [batch.id, item.id, batch.kitchenId, batch.container, batch.weight, batch.weight_value, batch.unit, batch.expiry, batch.package_capacity, batch.package_unit]
+          'INSERT INTO inventory_batches (id, inventoryId, kitchenId, container, weight, qty_packed, qty_loose, unit, expiry, package_capacity, package_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [batch.id, item.id, batch.kitchenId, batch.container, batch.weight, batch.qty_packed, batch.qty_loose, batch.unit, batch.expiry, batch.package_capacity, batch.package_unit]
         );
         batchCount++;
       }

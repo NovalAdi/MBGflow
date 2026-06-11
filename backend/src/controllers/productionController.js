@@ -265,28 +265,40 @@ async function startProductionLog(req, res) {
           for (const batch of batches) {
             if (remainingNeeded <= 0) break;
 
-            const currentWeightValue = Number(batch.weight_value) || 0;
+            const qtyPacked = Number(batch.qty_packed) || 0;
+            const qtyLoose = Number(batch.qty_loose) || 0;
             const batchUnit = batch.unit || 'kg';
             const cap = Number(batch.package_capacity);
             const pkgUnit = (batch.package_unit || '').trim();
 
-            if (currentWeightValue > 0) {
-              const neededInBatchUnit = convertUnit(remainingNeeded, ing.unit, batchUnit, cap, pkgUnit);
+            const currentTotal = (!isNaN(cap) && cap > 0 && pkgUnit) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
+
+            if (currentTotal > 0) {
+              const targetUnit = pkgUnit || batchUnit;
+              const neededInStandardUnit = convertUnit(remainingNeeded, ing.unit, targetUnit, cap, pkgUnit);
               
-              if (currentWeightValue >= neededInBatchUnit) {
-                const newWeightValue = currentWeightValue - neededInBatchUnit;
-                const formattedWeight = formatSingleBatch(newWeightValue, batchUnit, cap, pkgUnit);
+              if (currentTotal >= neededInStandardUnit) {
+                const newTotal = currentTotal - neededInStandardUnit;
+                let newQtyPacked = 0;
+                let newQtyLoose = 0;
+                if (!isNaN(cap) && cap > 0) {
+                  newQtyPacked = Math.floor(newTotal / cap);
+                  newQtyLoose = Number((newTotal % cap).toFixed(4));
+                } else {
+                  newQtyLoose = Number(newTotal.toFixed(4));
+                }
+                const formattedWeight = formatSingleBatch(newQtyPacked, newQtyLoose, batch.container, cap, pkgUnit);
                 await connection.query(
-                  'UPDATE inventory_batches SET weight_value = ?, weight = ? WHERE id = ?',
-                  [newWeightValue, formattedWeight, batch.id]
+                  'UPDATE inventory_batches SET qty_packed = ?, qty_loose = ?, weight = ? WHERE id = ?',
+                  [newQtyPacked, newQtyLoose, formattedWeight, batch.id]
                 );
                 remainingNeeded = 0;
               } else {
-                const consumedInIngredientUnit = convertUnit(currentWeightValue, batchUnit, ing.unit, cap, pkgUnit);
+                const consumedInIngredientUnit = convertUnit(currentTotal, targetUnit, ing.unit, cap, pkgUnit);
                 remainingNeeded = Math.max(0, remainingNeeded - consumedInIngredientUnit);
-                const formattedWeight = formatSingleBatch(0, batchUnit, cap, pkgUnit);
+                const formattedWeight = formatSingleBatch(0, 0, batch.container, cap, pkgUnit);
                 await connection.query(
-                  'UPDATE inventory_batches SET weight_value = 0, weight = ? WHERE id = ?',
+                  'UPDATE inventory_batches SET qty_packed = 0, qty_loose = 0, weight = ? WHERE id = ?',
                   [formattedWeight, batch.id]
                 );
               }
@@ -361,15 +373,13 @@ async function checkAndNotifyShortage(planId, connection) {
       
       let available = 0;
       for (const batch of batches) {
-        let val = Number(batch.weight_value) || 0;
-        let baseUnit = batch.unit || "kg";
+        const qtyPacked = Number(batch.qty_packed) || 0;
+        const qtyLoose = Number(batch.qty_loose) || 0;
         const cap = Number(batch.package_capacity);
         const pkgU = batch.package_unit;
 
-        if (!isNaN(cap) && cap > 0 && pkgU) {
-          val = val * cap;
-          baseUnit = pkgU;
-        }
+        let val = (!isNaN(cap) && cap > 0 && pkgU) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
+        let baseUnit = pkgU || batch.unit || "kg";
 
         const uLower = baseUnit.toLowerCase();
         if (uLower === 'g' || uLower === 'ml') {

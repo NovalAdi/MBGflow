@@ -109,8 +109,14 @@ export const AdminDashboard = () => {
             <h3 className="font-extrabold text-2xl text-slate-800 tracking-tight">Rencana Masak</h3>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">Jadwal Produksi Harian</p>
           </div>
-          <Button size="icon" variant="ghost" className="rounded-full w-8 h-8" onClick={() => navigate("/admin/planning")}>
-              <Plus className="w-4 h-4" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-xs font-bold text-primary border-primary/20 hover:bg-primary/5 hover:border-primary/45 transition-all flex items-center gap-1.5 px-4 py-2 rounded-xl"
+            onClick={() => navigate("/admin/history")}
+          >
+            Histori Produksi
+            <ChevronRight className="w-3.5 h-3.5" />
           </Button>
         </div>
         
@@ -257,17 +263,6 @@ export const AdminDashboard = () => {
         )}
       </Modal>
 
-      {/* Action Footer */}
-      <div className="flex justify-end !mt-12">
-        <Button 
-          variant="primary" 
-          className="shadow-lg shadow-primary/30 py-6 px-10 rounded-2xl group transition-all hover:scale-105 active:scale-95"
-          onClick={() => navigate("/admin/history")}
-        >
-          Akses Tabel Histori Produksi
-          <ChevronRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
-        </Button>
-      </div>
     </div>
   );
 };
