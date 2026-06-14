@@ -59,13 +59,15 @@ async function resetDatabase() {
       'ingredients',
       'inventory_batches',
       'inventory',
-      'staff',
+      'users',
       'menus',
       'kitchens'
     ];
     for (const table of tables) {
       await connection.query(`DROP TABLE IF EXISTS \`${table}\`;`);
     }
+    // Also drop legacy 'staff' table if it exists
+    await connection.query('DROP TABLE IF EXISTS `staff`;');
     await connection.query('SET FOREIGN_KEY_CHECKS = 1;');
     console.log('All tables dropped successfully (clean reset).');
   } catch (error) {
@@ -145,9 +147,9 @@ async function createTables() {
       );
     `);
 
-    // Staff table
+    // Users table (formerly 'staff')
     await connection.query(`
-      CREATE TABLE IF NOT EXISTS staff (
+      CREATE TABLE IF NOT EXISTS users (
         id VARCHAR(50) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         role VARCHAR(50) NOT NULL,
@@ -166,15 +168,14 @@ async function createTables() {
         id VARCHAR(50) PRIMARY KEY,
         day VARCHAR(20) NOT NULL,
         menuId VARCHAR(50) NOT NULL,
-        menuName VARCHAR(255) NOT NULL,
         kitchenId VARCHAR(50) NOT NULL,
-        kitchenName VARCHAR(255) NOT NULL,
         portions INT NOT NULL,
         note TEXT,
         status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-        chefPenanggungJawab VARCHAR(255),
+        userId VARCHAR(50),
         FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE,
-        FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE CASCADE
+        FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE CASCADE,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
       );
     `);
 
@@ -183,14 +184,14 @@ async function createTables() {
       CREATE TABLE IF NOT EXISTS production_logs (
         id VARCHAR(50) PRIMARY KEY,
         kitchenId VARCHAR(50),
-        kitchen VARCHAR(255) NOT NULL,
-        menu VARCHAR(255) NOT NULL,
+        menuId VARCHAR(50) NOT NULL,
         servings INT NOT NULL,
-        city VARCHAR(100),
         startTime VARCHAR(100),
+        endTime VARCHAR(100),
         qaNotes TEXT,
         status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE SET NULL
+        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE SET NULL,
+        FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE CASCADE
       );
     `);
 
@@ -204,10 +205,10 @@ async function createTables() {
         status VARCHAR(50) NOT NULL DEFAULT 'Pending',
         createdAt VARCHAR(100) NOT NULL,
         kitchenId VARCHAR(50) NULL,
-        kitchenName VARCHAR(255) NULL,
         supplierKitchenId VARCHAR(50) NULL,
-        supplierKitchenName VARCHAR(255) NULL,
-        adminNotes TEXT NULL
+        note TEXT NULL,
+        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE SET NULL,
+        FOREIGN KEY (supplierKitchenId) REFERENCES kitchens(id) ON DELETE SET NULL
       );
     `);
 
@@ -215,14 +216,15 @@ async function createTables() {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS wastage_records (
         id VARCHAR(50) PRIMARY KEY,
-        kitchen VARCHAR(255) NOT NULL,
-        city VARCHAR(100) NOT NULL,
-        material VARCHAR(255) NOT NULL,
+        kitchenId VARCHAR(50) NOT NULL,
+        inventoryId VARCHAR(50) NOT NULL,
         weight DECIMAL(10,2) NOT NULL,
         unit VARCHAR(20) NOT NULL DEFAULT 'kg',
         reason VARCHAR(255) NOT NULL,
         cost INT NOT NULL,
-        date VARCHAR(50) NOT NULL
+        date VARCHAR(50) NOT NULL,
+        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE,
+        FOREIGN KEY (inventoryId) REFERENCES inventory(id) ON DELETE CASCADE
       );
     `);
 
@@ -445,9 +447,9 @@ async function seedDatabase() {
     console.log(`  ✓ ${inventory.length} inventory items with ${batchCount} batches seeded`);
 
     // =========================================================================
-    // 4. STAFF (with bcrypt password hashing)
+    // 4. USERS (formerly 'staff', with bcrypt password hashing)
     // =========================================================================
-    const staffList = [
+    const usersList = [
       { id: 's1', name: 'Noval Admin', role: 'Admin', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=noval', kitchenId: 'k1', email: 'novaladiperasetya@gmail.com', password: 'password' },
       { id: 's2', name: 'Andi Jakarta', role: 'Chef', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=andi', kitchenId: 'k1', email: 'chef.jakarta@mbg.com', password: 'password' },
       { id: 's3', name: 'Budi Tangerang', role: 'Chef', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=budi', kitchenId: 'k2', email: 'chef.tangerang@mbg.com', password: 'password' },
@@ -467,53 +469,50 @@ async function seedDatabase() {
       { id: 's_test_chef', name: 'Head Chef Test', role: 'Head Chef', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_chef', kitchenId: null, email: 'chef.test@mbg.com', password: 'password' },
       { id: 's_test_staff', name: 'Staff Test', role: 'Staff', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_staff', kitchenId: null, email: 'staff.test@mbg.com', password: 'password' },
     ];
-    for (const staff of staffList) {
-      const hashedPassword = await bcrypt.hash(staff.password, 10);
+    for (const user of usersList) {
+      const hashedPassword = await bcrypt.hash(user.password, 10);
       await connection.query(
-        'INSERT INTO staff (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [staff.id, staff.name, staff.role, staff.status, staff.avatar, staff.kitchenId, staff.email, hashedPassword]
+        'INSERT INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [user.id, user.name, user.role, user.status, user.avatar, user.kitchenId, user.email, hashedPassword]
       );
     }
-    console.log(`  ✓ ${staffList.length} staff members seeded (passwords hashed)`);
+    console.log(`  ✓ ${usersList.length} users seeded (passwords hashed)`);
 
     // =========================================================================
     // 5. PRODUCTION PLANS & PRODUCTION LOGS
     // =========================================================================
     const productionPlans = [
-      { id: 'plan-1', day: 'Senin', menuId: 'menu-1', menuName: 'Ayam Goreng Gurih', kitchenId: 'k1', kitchenName: 'Dapur Pusat Jakarta', portions: 400, note: 'Gunakan Batch b1', status: 'Ready', chefPenanggungJawab: 'Andi Jakarta' },
-      { id: 'plan-2', day: 'Senin', menuId: 'menu-3', menuName: 'Ikan Gurame Goreng', kitchenId: 'k2', kitchenName: 'Dapur Satelit Tangerang', portions: 200, note: 'Gunakan batch b9', status: 'Cooking', chefPenanggungJawab: 'Budi Tangerang' },
-      { id: 'plan-3', day: 'Selasa', menuId: 'menu-2', menuName: 'Ayam Bakar Madu', kitchenId: 'k1', kitchenName: 'Dapur Pusat Jakarta', portions: 300, note: '', status: 'Preparing', chefPenanggungJawab: 'Andi Jakarta' },
-      { id: 'plan-4', day: 'Selasa', menuId: 'menu-4', menuName: 'Ikan Gurame Bakar', kitchenId: 'k2', kitchenName: 'Dapur Satelit Tangerang', portions: 150, note: '', status: 'Pending', chefPenanggungJawab: 'Budi Tangerang' },
-      { id: 'plan-5', day: 'Rabu', menuId: 'menu-5', menuName: 'Bebek Goreng Spesial', kitchenId: 'k3', kitchenName: 'Production Hub Bandung', portions: 350, note: 'Gunakan batch b12', status: 'Pending', chefPenanggungJawab: 'Citra Bandung' },
-      { id: 'plan-6', day: 'Rabu', menuId: 'menu-6', menuName: 'Bebek Bakar Kecap', kitchenId: 'k3', kitchenName: 'Production Hub Bandung', portions: 200, note: '', status: 'Pending', chefPenanggungJawab: 'Citra Bandung' },
-      { id: 'plan-7', day: 'Kamis', menuId: 'menu-1', menuName: 'Ayam Goreng Gurih', kitchenId: 'k2', kitchenName: 'Dapur Satelit Tangerang', portions: 250, note: 'Batch b2a', status: 'Pending', chefPenanggungJawab: 'Budi Tangerang' },
-      { id: 'plan-8', day: 'Kamis', menuId: 'menu-5', menuName: 'Bebek Goreng Spesial', kitchenId: 'k1', kitchenName: 'Dapur Pusat Jakarta', portions: 180, note: '', status: 'Pending', chefPenanggungJawab: 'Chef Utomo' },
-      { id: 'plan-9', day: 'Jumat', menuId: 'menu-3', menuName: 'Ikan Gurame Goreng', kitchenId: 'k3', kitchenName: 'Production Hub Bandung', portions: 300, note: 'Batch b9a', status: 'Pending', chefPenanggungJawab: 'Citra Bandung' },
-      { id: 'plan-10', day: 'Jumat', menuId: 'menu-2', menuName: 'Ayam Bakar Madu', kitchenId: 'k2', kitchenName: 'Dapur Satelit Tangerang', portions: 220, note: '', status: 'Pending', chefPenanggungJawab: 'Budi Tangerang' },
+      { id: 'plan-1', day: 'Senin', menuId: 'menu-1', kitchenId: 'k1', portions: 400, note: 'Gunakan Batch b1', status: 'Ready', userId: 's2' },
+      { id: 'plan-2', day: 'Senin', menuId: 'menu-3', kitchenId: 'k2', portions: 200, note: 'Gunakan batch b9', status: 'Cooking', userId: 's3' },
+      { id: 'plan-3', day: 'Selasa', menuId: 'menu-2', kitchenId: 'k1', portions: 300, note: '', status: 'Preparing', userId: 's2' },
+      { id: 'plan-4', day: 'Selasa', menuId: 'menu-4', kitchenId: 'k2', portions: 150, note: '', status: 'Pending', userId: 's3' },
+      { id: 'plan-5', day: 'Rabu', menuId: 'menu-5', kitchenId: 'k3', portions: 350, note: 'Gunakan batch b12', status: 'Pending', userId: 's4' },
+      { id: 'plan-6', day: 'Rabu', menuId: 'menu-6', kitchenId: 'k3', portions: 200, note: '', status: 'Pending', userId: 's4' },
+      { id: 'plan-7', day: 'Kamis', menuId: 'menu-1', kitchenId: 'k2', portions: 250, note: 'Batch b2a', status: 'Pending', userId: 's3' },
+      { id: 'plan-8', day: 'Kamis', menuId: 'menu-5', kitchenId: 'k1', portions: 180, note: '', status: 'Pending', userId: 's6' },
+      { id: 'plan-9', day: 'Jumat', menuId: 'menu-3', kitchenId: 'k3', portions: 300, note: 'Batch b9a', status: 'Pending', userId: 's4' },
+      { id: 'plan-10', day: 'Jumat', menuId: 'menu-2', kitchenId: 'k2', portions: 220, note: '', status: 'Pending', userId: 's3' },
     ];
     for (const plan of productionPlans) {
       await connection.query(
-        'INSERT INTO production_plans (id, day, menuId, menuName, kitchenId, kitchenName, portions, note, status, chefPenanggungJawab) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [plan.id, plan.day, plan.menuId, plan.menuName, plan.kitchenId, plan.kitchenName, plan.portions, plan.note, plan.status, plan.chefPenanggungJawab]
+        'INSERT INTO production_plans (id, day, menuId, kitchenId, portions, note, status, userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [plan.id, plan.day, plan.menuId, plan.kitchenId, plan.portions, plan.note, plan.status, plan.userId]
       );
 
       // Create matching production log
-      const city = plan.kitchenName.includes('Jakarta')
-        ? 'Jakarta'
-        : plan.kitchenName.includes('Tangerang')
-        ? 'Tangerang'
-        : 'Bandung';
       const logStatus = plan.status === 'NotStarted' ? 'Pending' : plan.status;
       let startTime = null;
+      let endTime = null;
       if (plan.status === 'Cooking') {
         startTime = new Date().toISOString();
       } else if (plan.status === 'Ready') {
         startTime = new Date(Date.now() - 86400000).toISOString();
+        endTime = new Date(Date.now() - 82800000).toISOString(); // ~1 hour after start
       }
 
       await connection.query(
-        'INSERT INTO production_logs (id, kitchenId, kitchen, menu, servings, city, startTime, qaNotes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [plan.id, plan.kitchenId, plan.kitchenName, plan.menuName, plan.portions, city, startTime, plan.note, logStatus]
+        'INSERT INTO production_logs (id, kitchenId, menuId, servings, startTime, endTime, qaNotes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [plan.id, plan.kitchenId, plan.menuId, plan.portions, startTime, endTime, plan.note, logStatus]
       );
     }
     console.log(`  ✓ ${productionPlans.length} production plans & logs seeded`);
@@ -523,19 +522,19 @@ async function seedDatabase() {
     // =========================================================================
     const now = new Date();
     const stockRequests = [
-      { id: 'sr-1', material: 'Ayam Negri', amount: '10 karton', urgency: 'High', status: 'Approved', createdAt: new Date(now - 86400000 * 5).toISOString(), kitchenId: 'k1', kitchenName: 'Dapur Pusat Jakarta', supplierKitchenId: null, supplierKitchenName: null, adminNotes: 'Disetujui, kirim besok pagi' },
-      { id: 'sr-2', material: 'Minyak Goreng', amount: '5 jerigen', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 3).toISOString(), kitchenId: 'k2', kitchenName: 'Dapur Satelit Tangerang', supplierKitchenId: null, supplierKitchenName: null, adminNotes: null },
-      { id: 'sr-3', material: 'Ikan Gurame', amount: '8 karton', urgency: 'High', status: 'Pending', createdAt: new Date(now - 86400000 * 2).toISOString(), kitchenId: 'k2', kitchenName: 'Dapur Satelit Tangerang', supplierKitchenId: null, supplierKitchenName: null, adminNotes: null },
-      { id: 'sr-4', material: 'Bumbu Kuning', amount: '3 box', urgency: 'Low', status: 'Approved', createdAt: new Date(now - 86400000 * 7).toISOString(), kitchenId: 'k1', kitchenName: 'Dapur Pusat Jakarta', supplierKitchenId: 'k3', supplierKitchenName: 'Production Hub Bandung', adminNotes: 'Transfer antar dapur disetujui' },
-      { id: 'sr-5', material: 'Daging Bebek', amount: '12 karton', urgency: 'High', status: 'Rejected', createdAt: new Date(now - 86400000 * 4).toISOString(), kitchenId: 'k3', kitchenName: 'Production Hub Bandung', supplierKitchenId: null, supplierKitchenName: null, adminNotes: 'Supplier belum tersedia, coba minggu depan' },
-      { id: 'sr-6', material: 'Kecap Manis', amount: '4 jerigen', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 1).toISOString(), kitchenId: 'k1', kitchenName: 'Dapur Pusat Jakarta', supplierKitchenId: null, supplierKitchenName: null, adminNotes: null },
-      { id: 'sr-7', material: 'Bumbu Bebek', amount: '2 box', urgency: 'Low', status: 'Approved', createdAt: new Date(now - 86400000 * 6).toISOString(), kitchenId: 'k3', kitchenName: 'Production Hub Bandung', supplierKitchenId: 'k1', supplierKitchenName: 'Dapur Pusat Jakarta', adminNotes: 'Kirim dari Jakarta' },
-      { id: 'sr-8', material: 'Sambal Kecap', amount: '1 box', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 1).toISOString(), kitchenId: 'k2', kitchenName: 'Dapur Satelit Tangerang', supplierKitchenId: null, supplierKitchenName: null, adminNotes: null },
+      { id: 'sr-1', material: 'Ayam Negri', amount: '10 karton', urgency: 'High', status: 'Approved', createdAt: new Date(now - 86400000 * 5).toISOString(), kitchenId: 'k1', supplierKitchenId: null, note: 'Disetujui, kirim besok pagi' },
+      { id: 'sr-2', material: 'Minyak Goreng', amount: '5 jerigen', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 3).toISOString(), kitchenId: 'k2', supplierKitchenId: null, note: null },
+      { id: 'sr-3', material: 'Ikan Gurame', amount: '8 karton', urgency: 'High', status: 'Pending', createdAt: new Date(now - 86400000 * 2).toISOString(), kitchenId: 'k2', supplierKitchenId: null, note: null },
+      { id: 'sr-4', material: 'Bumbu Kuning', amount: '3 box', urgency: 'Low', status: 'Approved', createdAt: new Date(now - 86400000 * 7).toISOString(), kitchenId: 'k1', supplierKitchenId: 'k3', note: 'Transfer antar dapur disetujui' },
+      { id: 'sr-5', material: 'Daging Bebek', amount: '12 karton', urgency: 'High', status: 'Rejected', createdAt: new Date(now - 86400000 * 4).toISOString(), kitchenId: 'k3', supplierKitchenId: null, note: 'Supplier belum tersedia, coba minggu depan' },
+      { id: 'sr-6', material: 'Kecap Manis', amount: '4 jerigen', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 1).toISOString(), kitchenId: 'k1', supplierKitchenId: null, note: null },
+      { id: 'sr-7', material: 'Bumbu Bebek', amount: '2 box', urgency: 'Low', status: 'Approved', createdAt: new Date(now - 86400000 * 6).toISOString(), kitchenId: 'k3', supplierKitchenId: 'k1', note: 'Kirim dari Jakarta' },
+      { id: 'sr-8', material: 'Sambal Kecap', amount: '1 box', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 1).toISOString(), kitchenId: 'k2', supplierKitchenId: null, note: null },
     ];
     for (const sr of stockRequests) {
       await connection.query(
-        'INSERT INTO stock_requests (id, material, amount, urgency, status, createdAt, kitchenId, kitchenName, supplierKitchenId, supplierKitchenName, adminNotes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [sr.id, sr.material, sr.amount, sr.urgency, sr.status, sr.createdAt, sr.kitchenId, sr.kitchenName, sr.supplierKitchenId, sr.supplierKitchenName, sr.adminNotes]
+        'INSERT INTO stock_requests (id, material, amount, urgency, status, createdAt, kitchenId, supplierKitchenId, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [sr.id, sr.material, sr.amount, sr.urgency, sr.status, sr.createdAt, sr.kitchenId, sr.supplierKitchenId, sr.note]
       );
     }
     console.log(`  ✓ ${stockRequests.length} stock requests seeded`);
@@ -544,21 +543,21 @@ async function seedDatabase() {
     // 7. WASTAGE RECORDS
     // =========================================================================
     const wastageRecords = [
-      { id: 'W-1001', kitchen: 'Dapur Pusat Jakarta', city: 'Jakarta', material: 'Ayam Negri', weight: 2.5, unit: 'kg', reason: 'Kadaluarsa', cost: 87500, date: '2025-06-01' },
-      { id: 'W-1002', kitchen: 'Dapur Pusat Jakarta', city: 'Jakarta', material: 'Minyak Goreng', weight: 1.0, unit: 'L', reason: 'Tumpah', cost: 35000, date: '2025-06-02' },
-      { id: 'W-1003', kitchen: 'Dapur Satelit Tangerang', city: 'Tangerang', material: 'Ikan Gurame', weight: 3.2, unit: 'kg', reason: 'Busuk', cost: 112000, date: '2025-06-01' },
-      { id: 'W-1004', kitchen: 'Dapur Satelit Tangerang', city: 'Tangerang', material: 'Bumbu Ikan', weight: 0.5, unit: 'kg', reason: 'Kadaluarsa', cost: 17500, date: '2025-06-03' },
-      { id: 'W-1005', kitchen: 'Production Hub Bandung', city: 'Bandung', material: 'Daging Bebek', weight: 4.0, unit: 'kg', reason: 'Freezer Rusak', cost: 140000, date: '2025-05-28' },
-      { id: 'W-1006', kitchen: 'Production Hub Bandung', city: 'Bandung', material: 'Bumbu Bebek', weight: 1.0, unit: 'kg', reason: 'Packaging Rusak', cost: 35000, date: '2025-05-30' },
-      { id: 'W-1007', kitchen: 'Dapur Pusat Jakarta', city: 'Jakarta', material: 'Bumbu Kuning', weight: 0.8, unit: 'kg', reason: 'Kadaluarsa', cost: 28000, date: '2025-06-04' },
-      { id: 'W-1008', kitchen: 'Dapur Satelit Tangerang', city: 'Tangerang', material: 'Kecap Manis', weight: 1.5, unit: 'L', reason: 'Tumpah', cost: 52500, date: '2025-06-05' },
-      { id: 'W-1009', kitchen: 'Production Hub Bandung', city: 'Bandung', material: 'Madu & Kecap', weight: 0.5, unit: 'L', reason: 'Kadaluarsa', cost: 17500, date: '2025-06-03' },
-      { id: 'W-1010', kitchen: 'Dapur Pusat Jakarta', city: 'Jakarta', material: 'Ayam Negri', weight: 1.8, unit: 'kg', reason: 'Sisa Produksi', cost: 63000, date: '2025-06-06' },
+      { id: 'W-1001', kitchenId: 'k1', inventoryId: 'mat-1', weight: 2.5, unit: 'kg', reason: 'Kadaluarsa', cost: 87500, date: '2025-06-01' },
+      { id: 'W-1002', kitchenId: 'k1', inventoryId: 'mat-2', weight: 1.0, unit: 'L', reason: 'Tumpah', cost: 35000, date: '2025-06-02' },
+      { id: 'W-1003', kitchenId: 'k2', inventoryId: 'mat-5', weight: 3.2, unit: 'kg', reason: 'Busuk', cost: 112000, date: '2025-06-01' },
+      { id: 'W-1004', kitchenId: 'k2', inventoryId: 'mat-6', weight: 0.5, unit: 'kg', reason: 'Kadaluarsa', cost: 17500, date: '2025-06-03' },
+      { id: 'W-1005', kitchenId: 'k3', inventoryId: 'mat-8', weight: 4.0, unit: 'kg', reason: 'Freezer Rusak', cost: 140000, date: '2025-05-28' },
+      { id: 'W-1006', kitchenId: 'k3', inventoryId: 'mat-9', weight: 1.0, unit: 'kg', reason: 'Packaging Rusak', cost: 35000, date: '2025-05-30' },
+      { id: 'W-1007', kitchenId: 'k1', inventoryId: 'mat-3', weight: 0.8, unit: 'kg', reason: 'Kadaluarsa', cost: 28000, date: '2025-06-04' },
+      { id: 'W-1008', kitchenId: 'k2', inventoryId: 'mat-4', weight: 1.5, unit: 'L', reason: 'Tumpah', cost: 52500, date: '2025-06-05' },
+      { id: 'W-1009', kitchenId: 'k3', inventoryId: 'mat-10', weight: 0.5, unit: 'L', reason: 'Kadaluarsa', cost: 17500, date: '2025-06-03' },
+      { id: 'W-1010', kitchenId: 'k1', inventoryId: 'mat-1', weight: 1.8, unit: 'kg', reason: 'Sisa Produksi', cost: 63000, date: '2025-06-06' },
     ];
     for (const w of wastageRecords) {
       await connection.query(
-        'INSERT INTO wastage_records (id, kitchen, city, material, weight, unit, reason, cost, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [w.id, w.kitchen, w.city, w.material, w.weight, w.unit, w.reason, w.cost, w.date]
+        'INSERT INTO wastage_records (id, kitchenId, inventoryId, weight, unit, reason, cost, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [w.id, w.kitchenId, w.inventoryId, w.weight, w.unit, w.reason, w.cost, w.date]
       );
     }
     console.log(`  ✓ ${wastageRecords.length} wastage records seeded`);

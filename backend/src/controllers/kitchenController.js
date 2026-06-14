@@ -47,7 +47,7 @@ async function createKitchen(req, res) {
 
     if (Array.isArray(staffIds) && staffIds.length > 0) {
       await db.query(
-        'UPDATE staff SET kitchenId = ? WHERE id IN (?)',
+        'UPDATE users SET kitchenId = ? WHERE id IN (?)',
         [newKitchen.id, staffIds]
       );
     }
@@ -123,8 +123,17 @@ async function getKitchenDetail(req, res) {
 
     const kitchen = kitchens[0];
 
-    const [activeProductions] = await db.query('SELECT * FROM production_logs WHERE kitchenId = ?', [id]);
-    const [staffList] = await db.query("SELECT * FROM staff WHERE kitchenId = ? AND role IN ('Admin', 'Chef', 'Head Chef', 'Staff')", [id]);
+    // Production logs with menu name via JOIN
+    const [activeProductions] = await db.query(
+      `SELECT pl.*, m.name as menu, k.name as kitchen, k.city
+       FROM production_logs pl
+       JOIN menus m ON pl.menuId = m.id
+       JOIN kitchens k ON pl.kitchenId = k.id
+       WHERE pl.kitchenId = ?`,
+      [id]
+    );
+
+    const [userList] = await db.query("SELECT * FROM users WHERE kitchenId = ? AND role IN ('Admin', 'Chef', 'Head Chef', 'Staff')", [id]);
 
     const [inventoryItems] = await db.query('SELECT * FROM inventory');
     const [batches] = await db.query('SELECT * FROM inventory_batches WHERE kitchenId = ?', [id]);
@@ -172,7 +181,7 @@ async function getKitchenDetail(req, res) {
 
     res.json({
       ...kitchen,
-      staff: staffList,
+      staff: userList,
       shifts: [
         { type: 'Pagi', time: '06:00 - 14:00', staffCount: 6, avatars: ['https://i.pravatar.cc/150?u=a1', 'https://i.pravatar.cc/150?u=a2'] },
         { type: 'Sore', time: '14:00 - 22:00', staffCount: 4, avatars: ['https://i.pravatar.cc/150?u=a3'] }
@@ -270,27 +279,27 @@ async function addKitchenStaff(req, res) {
       return res.status(404).json({ error: 'Kitchen not found.' });
     }
 
-    // 2. If staffId is provided, we assign the existing staff member to this kitchen
+    // 2. If staffId is provided, we assign the existing user to this kitchen
     if (staffId) {
-      const [staff] = await db.query('SELECT * FROM staff WHERE id = ?', [staffId]);
-      if (staff.length === 0) {
-        return res.status(404).json({ error: 'Staff member not found.' });
+      const [users] = await db.query('SELECT * FROM users WHERE id = ?', [staffId]);
+      if (users.length === 0) {
+        return res.status(404).json({ error: 'User not found.' });
       }
       if (role) {
-        await db.query('UPDATE staff SET kitchenId = ?, role = ? WHERE id = ?', [kitchenId, role, staffId]);
+        await db.query('UPDATE users SET kitchenId = ?, role = ? WHERE id = ?', [kitchenId, role, staffId]);
       } else {
-        await db.query('UPDATE staff SET kitchenId = ? WHERE id = ?', [kitchenId, staffId]);
+        await db.query('UPDATE users SET kitchenId = ? WHERE id = ?', [kitchenId, staffId]);
       }
-      return res.json({ success: true, message: 'Staff successfully assigned to kitchen.' });
+      return res.json({ success: true, message: 'User successfully assigned to kitchen.' });
     }
 
-    // 3. Otherwise, we create a new staff member manually
+    // 3. Otherwise, we create a new user manually
     if (!name || !role || !email) {
       return res.status(400).json({ error: 'Name, role, and email are required for manual creation.' });
     }
 
     // Check if email already exists
-    const [existing] = await db.query('SELECT * FROM staff WHERE LOWER(email) = ?', [email.toLowerCase()]);
+    const [existing] = await db.query('SELECT * FROM users WHERE LOWER(email) = ?', [email.toLowerCase()]);
     if (existing.length > 0) {
       return res.status(400).json({ error: 'Email sudah terdaftar.' });
     }
@@ -300,7 +309,7 @@ async function addKitchenStaff(req, res) {
     const defaultPassword = password || 'password';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    const newStaff = {
+    const newUser = {
       id: newId,
       name,
       role,
@@ -312,12 +321,12 @@ async function addKitchenStaff(req, res) {
     };
 
     await db.query(
-      'INSERT INTO staff (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [newStaff.id, newStaff.name, newStaff.role, newStaff.status, newStaff.avatar, newStaff.kitchenId, newStaff.email, newStaff.password]
+      'INSERT INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [newUser.id, newUser.name, newUser.role, newUser.status, newUser.avatar, newUser.kitchenId, newUser.email, newUser.password]
     );
 
-    const { password: _, ...responseStaff } = newStaff;
-    res.status(201).json(responseStaff);
+    const { password: _, ...responseUser } = newUser;
+    res.status(201).json(responseUser);
   } catch (error) {
     console.error('Add kitchen staff error:', error);
     res.status(500).json({ error: 'Server error assigning or creating kitchen staff.' });

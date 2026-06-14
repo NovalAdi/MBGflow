@@ -9,7 +9,7 @@ async function getStats(req, res) {
     const [successfulServings] = await db.query("SELECT SUM(servings) as count FROM production_logs WHERE status = 'Ready'");
     const [currentlyCooking] = await db.query("SELECT COUNT(*) as count FROM production_logs WHERE status = 'Cooking'");
     const [totalActivities] = await db.query('SELECT COUNT(*) as count FROM production_logs');
-    const [chefsOnDuty] = await db.query("SELECT COUNT(*) as count FROM staff WHERE role = 'Chef'");
+    const [chefsOnDuty] = await db.query("SELECT COUNT(*) as count FROM users WHERE role = 'Chef'");
 
     res.json({
       activeKitchens: kitchenCount[0].count,

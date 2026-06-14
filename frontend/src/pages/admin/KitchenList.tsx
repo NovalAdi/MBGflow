@@ -51,7 +51,7 @@ export const KitchenList = () => {
 
   const fetchStaff = React.useCallback(async () => {
     try {
-      const staffList = await api.getStaff();
+      const staffList = await api.getUsers();
       // Filter unassigned staff
       const unassigned = staffList.filter(s => !s.kitchenId);
       setUnassignedStaff(unassigned);

@@ -48,7 +48,7 @@ export const KitchenDetail = () => {
 
   const fetchUnassignedStaff = React.useCallback(async () => {
     try {
-      const staffList = await api.getStaff();
+      const staffList = await api.getUsers();
       const unassigned = staffList.filter((s: any) => !s.kitchenId);
       setUnassignedStaff(unassigned);
       if (unassigned.length > 0) {
@@ -167,7 +167,7 @@ export const KitchenDetail = () => {
   const handleDeleteStaff = async (staffId: string) => {
     if (!confirm("Apakah Anda yakin ingin mengeluarkan staf ini dari dapur?")) return;
     try {
-      await api.deleteStaff(staffId);
+      await api.deleteUser(staffId);
       const updatedData = await api.getKitchenDetail(selectedKitchenId);
       setDetail(updatedData);
     } catch (err: any) {
@@ -228,7 +228,7 @@ export const KitchenDetail = () => {
           setStaffError("Nama lengkap dan email wajib diisi.");
           return;
         }
-        await api.updateStaff(editingStaff.id, {
+        await api.updateUser(editingStaff.id, {
           name: newStaffName,
           email: newStaffEmail,
           role: newStaffRole,

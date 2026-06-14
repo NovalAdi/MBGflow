@@ -33,28 +33,36 @@ export interface ProductionPlan {
   portions: number;
   note: string;
   status: Status;
+  userId?: string | null;
   chefPenanggungJawab: string;
+  chefName?: string;
 }
 
 export interface ProductionLog {
   id: string;
+  menuId?: string;
   menu: string;
   kitchen: string;
   city: string;
   status: Status;
   servings: number;
   startTime: string;
+  endTime?: string;
   chefPenanggungJawab?: string;
   qaNotes?: string;
 }
 
-export interface Staff {
+export interface User {
   id: string;
   name: string;
   role: string;
   status: 'Active' | 'Inactive';
   avatar: string;
+  kitchenId?: string | null;
+  email?: string;
 }
+
+export type Staff = User;
 
 export interface Shift {
   type: string;

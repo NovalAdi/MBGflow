@@ -7,8 +7,8 @@ const { protect } = require('../middlewares/authMiddleware');
 router.post('/login', authController.login);
 
 // Protected routes
-router.get('/staff', protect, authController.getStaff);
-router.put('/staff/:id', protect, authController.updateStaff);
-router.delete('/staff/:id', protect, authController.deleteStaff);
+router.get('/users', protect, authController.getUsers);
+router.put('/users/:id', protect, authController.updateUser);
+router.delete('/users/:id', protect, authController.deleteUser);
 
 module.exports = router;

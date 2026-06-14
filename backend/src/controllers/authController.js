@@ -13,7 +13,7 @@ async function login(req, res) {
   }
 
   try {
-    const [rows] = await db.query('SELECT * FROM staff WHERE LOWER(email) = ?', [email.toLowerCase()]);
+    const [rows] = await db.query('SELECT * FROM users WHERE LOWER(email) = ?', [email.toLowerCase()]);
     if (rows.length === 0) {
       return res.status(401).json({ error: 'Kredensial tidak valid: email tidak terdaftar.' });
     }
@@ -56,33 +56,33 @@ async function login(req, res) {
   }
 }
 
-async function getStaff(req, res) {
+async function getUsers(req, res) {
   await delay(50);
   try {
-    const [rows] = await db.query('SELECT id, name, role, status, avatar, kitchenId, email FROM staff');
+    const [rows] = await db.query('SELECT id, name, role, status, avatar, kitchenId, email FROM users');
     res.json(rows);
   } catch (error) {
-    console.error('Staff list error:', error);
-    res.status(500).json({ error: 'Server error fetching staff.' });
+    console.error('Users list error:', error);
+    res.status(500).json({ error: 'Server error fetching users.' });
   }
 }
 
-async function updateStaff(req, res) {
+async function updateUser(req, res) {
   await delay(100);
   const { id } = req.params;
   const { name, email, role, password } = req.body;
 
   try {
-    const [rows] = await db.query('SELECT * FROM staff WHERE id = ?', [id]);
+    const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Staff member not found.' });
+      return res.status(404).json({ error: 'User not found.' });
     }
 
     const current = rows[0];
     
     // Check if email already registered to someone else
     if (email && email.toLowerCase() !== current.email.toLowerCase()) {
-      const [existing] = await db.query('SELECT * FROM staff WHERE LOWER(email) = ? AND id != ?', [email.toLowerCase(), id]);
+      const [existing] = await db.query('SELECT * FROM users WHERE LOWER(email) = ? AND id != ?', [email.toLowerCase(), id]);
       if (existing.length > 0) {
         return res.status(400).json({ error: 'Email sudah terdaftar.' });
       }
@@ -102,38 +102,38 @@ async function updateStaff(req, res) {
     };
 
     await db.query(
-      'UPDATE staff SET name = ?, email = ?, role = ?, password = ? WHERE id = ?',
+      'UPDATE users SET name = ?, email = ?, role = ?, password = ? WHERE id = ?',
       [updated.name, updated.email, updated.role, updated.password, id]
     );
 
-    res.json({ success: true, message: 'Staff successfully updated.' });
+    res.json({ success: true, message: 'User successfully updated.' });
   } catch (error) {
-    console.error('Update staff error:', error);
-    res.status(500).json({ error: 'Server error updating staff.' });
+    console.error('Update user error:', error);
+    res.status(500).json({ error: 'Server error updating user.' });
   }
 }
 
-async function deleteStaff(req, res) {
+async function deleteUser(req, res) {
   await delay(100);
   const { id } = req.params;
 
   try {
-    const [rows] = await db.query('SELECT * FROM staff WHERE id = ?', [id]);
+    const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Staff member not found.' });
+      return res.status(404).json({ error: 'User not found.' });
     }
 
-    await db.query('UPDATE staff SET kitchenId = NULL WHERE id = ?', [id]);
-    res.json({ success: true, message: 'Staff successfully unassigned from kitchen.' });
+    await db.query('UPDATE users SET kitchenId = NULL WHERE id = ?', [id]);
+    res.json({ success: true, message: 'User successfully unassigned from kitchen.' });
   } catch (error) {
-    console.error('Delete staff error:', error);
-    res.status(500).json({ error: 'Server error deleting/unassigning staff.' });
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Server error deleting/unassigning user.' });
   }
 }
 
 module.exports = {
   login,
-  getStaff,
-  updateStaff,
-  deleteStaff
+  getUsers,
+  updateUser,
+  deleteUser
 };

@@ -56,11 +56,30 @@ async function getStockRequests(req, res) {
   try {
     let rows;
     if (kitchenId) {
-      [rows] = await db.query('SELECT * FROM stock_requests WHERE kitchenId = ? ORDER BY createdAt DESC', [kitchenId]);
+      [rows] = await db.query(
+        `SELECT sr.*, k.name as kitchenName, sk.name as supplierKitchenName
+         FROM stock_requests sr
+         LEFT JOIN kitchens k ON sr.kitchenId = k.id
+         LEFT JOIN kitchens sk ON sr.supplierKitchenId = sk.id
+         WHERE sr.kitchenId = ?
+         ORDER BY sr.createdAt DESC`,
+        [kitchenId]
+      );
     } else {
-      [rows] = await db.query('SELECT * FROM stock_requests ORDER BY createdAt DESC');
+      [rows] = await db.query(
+        `SELECT sr.*, k.name as kitchenName, sk.name as supplierKitchenName
+         FROM stock_requests sr
+         LEFT JOIN kitchens k ON sr.kitchenId = k.id
+         LEFT JOIN kitchens sk ON sr.supplierKitchenId = sk.id
+         ORDER BY sr.createdAt DESC`
+      );
     }
-    res.json(rows);
+    // Map 'note' to 'adminNotes' for frontend backward compatibility
+    const mapped = rows.map(r => ({
+      ...r,
+      adminNotes: r.note
+    }));
+    res.json(mapped);
   } catch (error) {
     console.error('Fetch stock requests error:', error);
     res.status(500).json({ error: 'Server error fetching stock requests.' });
@@ -78,17 +97,34 @@ async function createStockRequest(req, res) {
     status: 'Pending',
     createdAt: new Date().toISOString(),
     kitchenId: kitchenId || null,
-    kitchenName: kitchenName || null,
     supplierKitchenId: supplierKitchenId || null,
-    supplierKitchenName: supplierKitchenName || null
+    note: null
   };
 
   try {
     await db.query(
-      'INSERT INTO stock_requests (id, material, amount, urgency, status, createdAt, kitchenId, kitchenName, supplierKitchenId, supplierKitchenName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [newRequest.id, newRequest.material, newRequest.amount, newRequest.urgency, newRequest.status, newRequest.createdAt, newRequest.kitchenId, newRequest.kitchenName, newRequest.supplierKitchenId, newRequest.supplierKitchenName]
+      'INSERT INTO stock_requests (id, material, amount, urgency, status, createdAt, kitchenId, supplierKitchenId, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [newRequest.id, newRequest.material, newRequest.amount, newRequest.urgency, newRequest.status, newRequest.createdAt, newRequest.kitchenId, newRequest.supplierKitchenId, newRequest.note]
     );
-    res.status(201).json(newRequest);
+
+    // Fetch kitchen names for response
+    let responseKitchenName = kitchenName || null;
+    let responseSupplierName = supplierKitchenName || null;
+    if (newRequest.kitchenId && !responseKitchenName) {
+      const [k] = await db.query('SELECT name FROM kitchens WHERE id = ?', [newRequest.kitchenId]);
+      if (k.length > 0) responseKitchenName = k[0].name;
+    }
+    if (newRequest.supplierKitchenId && !responseSupplierName) {
+      const [sk] = await db.query('SELECT name FROM kitchens WHERE id = ?', [newRequest.supplierKitchenId]);
+      if (sk.length > 0) responseSupplierName = sk[0].name;
+    }
+
+    res.status(201).json({
+      ...newRequest,
+      kitchenName: responseKitchenName,
+      supplierKitchenName: responseSupplierName,
+      adminNotes: newRequest.note
+    });
   } catch (error) {
     console.error('Stock request error:', error);
     res.status(500).json({ error: 'Server error placing stock request.' });
@@ -104,6 +140,13 @@ async function createStockRequestBatch(req, res) {
 
   try {
     const newRequests = [];
+    // Fetch kitchen name if not provided
+    let resolvedKitchenName = kitchenName || null;
+    if (kitchenId && !resolvedKitchenName) {
+      const [k] = await db.query('SELECT name FROM kitchens WHERE id = ?', [kitchenId]);
+      if (k.length > 0) resolvedKitchenName = k[0].name;
+    }
+
     for (let i = 0; i < requests.length; i++) {
       const reqItem = requests[i];
       const newRequest = {
@@ -114,15 +157,27 @@ async function createStockRequestBatch(req, res) {
         status: 'Pending',
         createdAt: new Date().toISOString(),
         kitchenId: reqItem.kitchenId || kitchenId || null,
-        kitchenName: reqItem.kitchenName || kitchenName || null,
         supplierKitchenId: reqItem.supplierKitchenId || null,
-        supplierKitchenName: reqItem.supplierKitchenName || null
+        note: null
       };
       await db.query(
-        'INSERT INTO stock_requests (id, material, amount, urgency, status, createdAt, kitchenId, kitchenName, supplierKitchenId, supplierKitchenName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [newRequest.id, newRequest.material, newRequest.amount, newRequest.urgency, newRequest.status, newRequest.createdAt, newRequest.kitchenId, newRequest.kitchenName, newRequest.supplierKitchenId, newRequest.supplierKitchenName]
+        'INSERT INTO stock_requests (id, material, amount, urgency, status, createdAt, kitchenId, supplierKitchenId, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [newRequest.id, newRequest.material, newRequest.amount, newRequest.urgency, newRequest.status, newRequest.createdAt, newRequest.kitchenId, newRequest.supplierKitchenId, newRequest.note]
       );
-      newRequests.push(newRequest);
+
+      // Resolve supplier name
+      let supplierName = reqItem.supplierKitchenName || null;
+      if (newRequest.supplierKitchenId && !supplierName) {
+        const [sk] = await db.query('SELECT name FROM kitchens WHERE id = ?', [newRequest.supplierKitchenId]);
+        if (sk.length > 0) supplierName = sk[0].name;
+      }
+
+      newRequests.push({
+        ...newRequest,
+        kitchenName: resolvedKitchenName,
+        supplierKitchenName: supplierName,
+        adminNotes: newRequest.note
+      });
     }
     res.status(201).json(newRequests);
   } catch (error) {
@@ -151,9 +206,11 @@ async function reportWastage(req, res) {
     let newQtyPacked = 0;
     let newQtyLoose = 0;
     let standardQty = Number(weight);
+    let inventoryId = null;
 
     if (batches.length > 0) {
       const batch = batches[0];
+      inventoryId = batch.inventoryId;
       const qtyPacked = Number(batch.qty_packed) || 0;
       const qtyLoose = Number(batch.qty_loose) || 0;
       const dbUnit = batch.unit || 'kg';
@@ -192,6 +249,25 @@ async function reportWastage(req, res) {
           standardQty = convertUnit(Number(weight), displayUnit, 'L');
         }
       }
+    } else {
+      // Try to find inventoryId from materialName
+      const [invItems] = await connection.query('SELECT id FROM inventory WHERE LOWER(name) = ?', [materialName.toLowerCase()]);
+      if (invItems.length > 0) {
+        inventoryId = invItems[0].id;
+      }
+    }
+
+    // If we still don't have an inventoryId, look it up
+    if (!inventoryId) {
+      const [invItems] = await connection.query('SELECT id FROM inventory WHERE LOWER(name) = ?', [materialName.toLowerCase()]);
+      if (invItems.length > 0) {
+        inventoryId = invItems[0].id;
+      } else {
+        // Cannot create wastage record without a valid inventoryId FK
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({ error: 'Bahan baku tidak ditemukan di inventory.' });
+      }
     }
 
     const [kitchens] = await connection.query('SELECT * FROM kitchens WHERE id = ?', [kitchenId]);
@@ -200,9 +276,8 @@ async function reportWastage(req, res) {
 
     const newWastageRecord = {
       id: `W-${Date.now()}`,
-      kitchen: kName,
-      city: city,
-      material: materialName,
+      kitchenId: kitchenId,
+      inventoryId: inventoryId,
       weight: Number(weight),
       unit: displayUnit,
       reason: reason || 'Busuk',
@@ -211,12 +286,11 @@ async function reportWastage(req, res) {
     };
 
     await connection.query(
-      'INSERT INTO wastage_records (id, kitchen, city, material, weight, unit, reason, cost, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO wastage_records (id, kitchenId, inventoryId, weight, unit, reason, cost, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         newWastageRecord.id,
-        newWastageRecord.kitchen,
-        newWastageRecord.city,
-        newWastageRecord.material,
+        newWastageRecord.kitchenId,
+        newWastageRecord.inventoryId,
         newWastageRecord.weight,
         newWastageRecord.unit,
         newWastageRecord.reason,
@@ -228,7 +302,13 @@ async function reportWastage(req, res) {
     await connection.commit();
     connection.release();
 
-    res.status(201).json(newWastageRecord);
+    // Return response with kitchen/material names for frontend compatibility
+    res.status(201).json({
+      ...newWastageRecord,
+      kitchen: kName,
+      city: city,
+      material: materialName
+    });
   } catch (error) {
     await connection.rollback();
     connection.release();
@@ -240,7 +320,13 @@ async function reportWastage(req, res) {
 async function getWastage(req, res) {
   await delay(50);
   try {
-    const [rows] = await db.query('SELECT * FROM wastage_records ORDER BY id DESC');
+    const [rows] = await db.query(
+      `SELECT wr.*, k.name as kitchen, k.city, i.name as material
+       FROM wastage_records wr
+       JOIN kitchens k ON wr.kitchenId = k.id
+       JOIN inventory i ON wr.inventoryId = i.id
+       ORDER BY wr.id DESC`
+    );
     res.json(rows);
   } catch (error) {
     console.error('Wastage logs error:', error);
@@ -259,8 +345,16 @@ async function getChefDashboardData(req, res) {
     }
     const kitchen = kitchenRows[0];
     
-    const [staff] = await db.query("SELECT * FROM staff WHERE kitchenId = ? AND role IN ('Chef', 'Head Chef', 'Staff')", [kitchenId]);
-    const [todayPlans] = await db.query('SELECT * FROM production_logs WHERE kitchenId = ?', [kitchenId]);
+    const [users] = await db.query("SELECT * FROM users WHERE kitchenId = ? AND role IN ('Chef', 'Head Chef', 'Staff')", [kitchenId]);
+
+    // Production logs with menu name via JOIN
+    const [todayPlans] = await db.query(
+      `SELECT pl.*, m.name as menu
+       FROM production_logs pl
+       JOIN menus m ON pl.menuId = m.id
+       WHERE pl.kitchenId = ?`,
+      [kitchenId]
+    );
     
     let totalPortions = 0;
     let completedPortions = 0;
@@ -319,7 +413,12 @@ async function getChefDashboardData(req, res) {
     }
     
     const [recentRequests] = await db.query(
-      'SELECT * FROM stock_requests WHERE kitchenId = ? ORDER BY createdAt DESC LIMIT 5',
+      `SELECT sr.*, k.name as kitchenName, sk.name as supplierKitchenName
+       FROM stock_requests sr
+       LEFT JOIN kitchens k ON sr.kitchenId = k.id
+       LEFT JOIN kitchens sk ON sr.supplierKitchenId = sk.id
+       WHERE sr.kitchenId = ?
+       ORDER BY sr.createdAt DESC LIMIT 5`,
       [kitchenId]
     );
     
@@ -340,7 +439,7 @@ async function getChefDashboardData(req, res) {
         status: plan.status,
         startTime: plan.startTime
       })),
-      staff,
+      staff: users,
       criticalStock,
       recentRequests
     });
@@ -442,7 +541,7 @@ async function updateStockRequestStatus(req, res) {
     }
     
     await db.query(
-      'UPDATE stock_requests SET status = ?, adminNotes = ? WHERE id = ?',
+      'UPDATE stock_requests SET status = ?, note = ? WHERE id = ?',
       [status, adminNotes || null, id]
     );
     

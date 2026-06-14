@@ -1,359 +1,363 @@
-@startuml ERD_MBGflow_Chen_Notation
-'======================================================================
-' ERD Chen's Notation - MBGflow Database
-' Generated from: backend/src/config/db.js
-'======================================================================
+@startdot
+digraph ERD_MBGflow {
+    // ======================================================================
+    // ERD Chen's Notation - MBGflow Database
+    // Generated from: backend/src/config/db.js
+    // ======================================================================
 
-skinparam backgroundColor #FEFEFE
-skinparam defaultFontName "Segoe UI"
-skinparam defaultFontSize 10
+    graph [
+        rankdir=TB,
+        splines=true,
+        nodesep=0.35,
+        ranksep=0.55,
+        bgcolor="white",
+        fontname="Arial",
+        pad=0.3,
+        dpi=150
+    ];
+    node [fontname="Arial", color="#333333"];
+    edge [dir=none, color="#333333", penwidth=0.8];
 
-skinparam rectangle {
-  BackgroundColor #D6EAF8
-  BorderColor #2980B9
-  FontColor #1B4F72
-  FontStyle bold
-  RoundCorner 5
+    // ==============================================================
+    //  ENTITIES (Rectangles - shape=box)
+    // ==============================================================
+    node [shape=box, fontsize=10, style="bold", height=0.35, margin="0.12,0.06"];
+
+    KITCHENS;
+    MENUS;
+    INGREDIENTS;
+    INVENTORY;
+    INVENTORY_BATCHES;
+    STAFF;
+    PRODUCTION_PLANS;
+    PRODUCTION_LOGS;
+    STOCK_REQUESTS;
+    WASTAGE_RECORDS;
+    NOTIFICATIONS;
+    STOCK_VERIFICATIONS;
+
+    // ==============================================================
+    //  RELATIONSHIPS (Diamonds - shape=diamond)
+    // ==============================================================
+    node [shape=diamond, fontsize=8, style="", height=0.55, width=0.9,
+          margin="0.04,0.04"];
+
+    R_menu_ing      [label="memiliki"];
+    R_inv_batch     [label="memiliki"];
+    R_batch_kit     [label="disimpan\ndi"];
+    R_staff_kit     [label="bekerja\ndi"];
+    R_pp_kit        [label="rencana\nproduksi"];
+    R_pp_menu       [label="menggunakan\nmenu"];
+    R_pl_kit        [label="mencatat\nlog"];
+    R_notif_kit     [label="menerima\nnotif"];
+    R_sv_kit        [label="verifikasi\nstok"];
+
+    // ==============================================================
+    //  ATTRIBUTES (Ellipses - shape=ellipse)
+    //  PK = underlined, FK = dashed border
+    // ==============================================================
+    node [shape=ellipse, fontsize=7, style="", height=0.22, width=0.45,
+          margin="0.04,0.02"];
+
+    // ---------- KITCHENS ----------
+    k_id       [label=<<u>id</u>>];
+    k_name     [label="name"];
+    k_address  [label="address"];
+    k_capacity [label="capacity"];
+    k_city     [label="city"];
+    k_lat      [label="latitude"];
+    k_long     [label="longitude"];
+    k_maps     [label="maps_url"];
+
+    // ---------- MENUS ----------
+    m_id   [label=<<u>id</u>>];
+    m_name [label="name"];
+
+    // ---------- INGREDIENTS ----------
+    i_id      [label=<<u>id</u>>];
+    i_menuId  [label="menuId", style="dashed"];
+    i_name    [label="name"];
+    i_perP    [label="perPortion"];
+    i_unit    [label="unit"];
+
+    // ---------- INVENTORY ----------
+    inv_id      [label=<<u>id</u>>];
+    inv_name    [label="name"];
+    inv_sku     [label="logistics_sku"];
+    inv_base    [label="base_unit"];
+    inv_hasPkg  [label="has_packaging"];
+    inv_pkgN    [label="packaging_name"];
+    inv_pkgC    [label="packaging_cap"];
+
+    // ---------- INVENTORY_BATCHES ----------
+    ib_id      [label=<<u>id</u>>];
+    ib_invId   [label="inventoryId", style="dashed"];
+    ib_kitId   [label="kitchenId", style="dashed"];
+    ib_cont    [label="container"];
+    ib_weight  [label="weight"];
+    ib_qtyP    [label="qty_packed"];
+    ib_qtyL    [label="qty_loose"];
+    ib_unit    [label="unit"];
+    ib_pkgCap  [label="pkg_capacity"];
+    ib_pkgU    [label="pkg_unit"];
+    ib_exp     [label="expiry"];
+
+    // ---------- STAFF ----------
+    s_id    [label=<<u>id</u>>];
+    s_name  [label="name"];
+    s_role  [label="role"];
+    s_stat  [label="status"];
+    s_avt   [label="avatar"];
+    s_kitId [label="kitchenId", style="dashed"];
+    s_email [label="email"];
+    s_pass  [label="password"];
+
+    // ---------- PRODUCTION_PLANS ----------
+    pp_id      [label=<<u>id</u>>];
+    pp_day     [label="day"];
+    pp_menuId  [label="menuId", style="dashed"];
+    pp_menuN   [label="menuName"];
+    pp_kitId   [label="kitchenId", style="dashed"];
+    pp_kitN    [label="kitchenName"];
+    pp_port    [label="portions"];
+    pp_note    [label="note"];
+    pp_stat    [label="status"];
+    pp_chef    [label="chefPJ"];
+
+    // ---------- PRODUCTION_LOGS ----------
+    pl_id      [label=<<u>id</u>>];
+    pl_kitId   [label="kitchenId", style="dashed"];
+    pl_kit     [label="kitchen"];
+    pl_menu    [label="menu"];
+    pl_serv    [label="servings"];
+    pl_city    [label="city"];
+    pl_start   [label="startTime"];
+    pl_qa      [label="qaNotes"];
+    pl_stat    [label="status"];
+
+    // ---------- STOCK_REQUESTS ----------
+    sr_id      [label=<<u>id</u>>];
+    sr_mat     [label="material"];
+    sr_amt     [label="amount"];
+    sr_urg     [label="urgency"];
+    sr_stat    [label="status"];
+    sr_cAt     [label="createdAt"];
+    sr_kitId   [label="kitchenId"];
+    sr_kitN    [label="kitchenName"];
+    sr_supId   [label="supplierKitId"];
+    sr_supN    [label="supplierKitName"];
+    sr_notes   [label="adminNotes"];
+
+    // ---------- WASTAGE_RECORDS ----------
+    w_id     [label=<<u>id</u>>];
+    w_kit    [label="kitchen"];
+    w_city   [label="city"];
+    w_mat    [label="material"];
+    w_weight [label="weight"];
+    w_unit   [label="unit"];
+    w_reason [label="reason"];
+    w_cost   [label="cost"];
+    w_date   [label="date"];
+
+    // ---------- NOTIFICATIONS ----------
+    n_id    [label=<<u>id</u>>];
+    n_kitId [label="kitchenId", style="dashed"];
+    n_msg   [label="message"];
+    n_read  [label="isRead"];
+    n_cAt   [label="createdAt"];
+
+    // ---------- STOCK_VERIFICATIONS ----------
+    sv_id    [label=<<u>id</u>>];
+    sv_kitId [label="kitchenId", style="dashed"];
+    sv_at    [label="verifiedAt"];
+    sv_by    [label="verifiedBy"];
+    sv_det   [label="details"];
+
+    // ==============================================================
+    //  ATTRIBUTE CONNECTIONS (Entity <-> Attribute)
+    // ==============================================================
+
+    // KITCHENS
+    k_id       -> KITCHENS;
+    k_name     -> KITCHENS;
+    k_address  -> KITCHENS;
+    k_capacity -> KITCHENS;
+    k_city     -> KITCHENS;
+    k_lat      -> KITCHENS;
+    k_long     -> KITCHENS;
+    k_maps     -> KITCHENS;
+
+    // MENUS
+    m_id   -> MENUS;
+    m_name -> MENUS;
+
+    // INGREDIENTS
+    i_id     -> INGREDIENTS;
+    i_menuId -> INGREDIENTS;
+    i_name   -> INGREDIENTS;
+    i_perP   -> INGREDIENTS;
+    i_unit   -> INGREDIENTS;
+
+    // INVENTORY
+    inv_id     -> INVENTORY;
+    inv_name   -> INVENTORY;
+    inv_sku    -> INVENTORY;
+    inv_base   -> INVENTORY;
+    inv_hasPkg -> INVENTORY;
+    inv_pkgN   -> INVENTORY;
+    inv_pkgC   -> INVENTORY;
+
+    // INVENTORY_BATCHES
+    ib_id     -> INVENTORY_BATCHES;
+    ib_invId  -> INVENTORY_BATCHES;
+    ib_kitId  -> INVENTORY_BATCHES;
+    ib_cont   -> INVENTORY_BATCHES;
+    ib_weight -> INVENTORY_BATCHES;
+    ib_qtyP   -> INVENTORY_BATCHES;
+    ib_qtyL   -> INVENTORY_BATCHES;
+    ib_unit   -> INVENTORY_BATCHES;
+    ib_pkgCap -> INVENTORY_BATCHES;
+    ib_pkgU   -> INVENTORY_BATCHES;
+    ib_exp    -> INVENTORY_BATCHES;
+
+    // STAFF
+    s_id    -> STAFF;
+    s_name  -> STAFF;
+    s_role  -> STAFF;
+    s_stat  -> STAFF;
+    s_avt   -> STAFF;
+    s_kitId -> STAFF;
+    s_email -> STAFF;
+    s_pass  -> STAFF;
+
+    // PRODUCTION_PLANS
+    pp_id     -> PRODUCTION_PLANS;
+    pp_day    -> PRODUCTION_PLANS;
+    pp_menuId -> PRODUCTION_PLANS;
+    pp_menuN  -> PRODUCTION_PLANS;
+    pp_kitId  -> PRODUCTION_PLANS;
+    pp_kitN   -> PRODUCTION_PLANS;
+    pp_port   -> PRODUCTION_PLANS;
+    pp_note   -> PRODUCTION_PLANS;
+    pp_stat   -> PRODUCTION_PLANS;
+    pp_chef   -> PRODUCTION_PLANS;
+
+    // PRODUCTION_LOGS
+    pl_id    -> PRODUCTION_LOGS;
+    pl_kitId -> PRODUCTION_LOGS;
+    pl_kit   -> PRODUCTION_LOGS;
+    pl_menu  -> PRODUCTION_LOGS;
+    pl_serv  -> PRODUCTION_LOGS;
+    pl_city  -> PRODUCTION_LOGS;
+    pl_start -> PRODUCTION_LOGS;
+    pl_qa    -> PRODUCTION_LOGS;
+    pl_stat  -> PRODUCTION_LOGS;
+
+    // STOCK_REQUESTS
+    sr_id    -> STOCK_REQUESTS;
+    sr_mat   -> STOCK_REQUESTS;
+    sr_amt   -> STOCK_REQUESTS;
+    sr_urg   -> STOCK_REQUESTS;
+    sr_stat  -> STOCK_REQUESTS;
+    sr_cAt   -> STOCK_REQUESTS;
+    sr_kitId -> STOCK_REQUESTS;
+    sr_kitN  -> STOCK_REQUESTS;
+    sr_supId -> STOCK_REQUESTS;
+    sr_supN  -> STOCK_REQUESTS;
+    sr_notes -> STOCK_REQUESTS;
+
+    // WASTAGE_RECORDS
+    w_id     -> WASTAGE_RECORDS;
+    w_kit    -> WASTAGE_RECORDS;
+    w_city   -> WASTAGE_RECORDS;
+    w_mat    -> WASTAGE_RECORDS;
+    w_weight -> WASTAGE_RECORDS;
+    w_unit   -> WASTAGE_RECORDS;
+    w_reason -> WASTAGE_RECORDS;
+    w_cost   -> WASTAGE_RECORDS;
+    w_date   -> WASTAGE_RECORDS;
+
+    // NOTIFICATIONS
+    n_id    -> NOTIFICATIONS;
+    n_kitId -> NOTIFICATIONS;
+    n_msg   -> NOTIFICATIONS;
+    n_read  -> NOTIFICATIONS;
+    n_cAt   -> NOTIFICATIONS;
+
+    // STOCK_VERIFICATIONS
+    sv_id    -> STOCK_VERIFICATIONS;
+    sv_kitId -> STOCK_VERIFICATIONS;
+    sv_at    -> STOCK_VERIFICATIONS;
+    sv_by    -> STOCK_VERIFICATIONS;
+    sv_det   -> STOCK_VERIFICATIONS;
+
+    // ==============================================================
+    //  RELATIONSHIP CONNECTIONS (with Cardinality)
+    // ==============================================================
+
+    // MENUS 1 --[memiliki]-- N INGREDIENTS
+    MENUS -> R_menu_ing [label="1", fontsize=8];
+    R_menu_ing -> INGREDIENTS [label="N", fontsize=8];
+
+    // INVENTORY 1 --[memiliki]-- N INVENTORY_BATCHES
+    INVENTORY -> R_inv_batch [label="1", fontsize=8];
+    R_inv_batch -> INVENTORY_BATCHES [label="N", fontsize=8];
+
+    // KITCHENS 1 --[disimpan di]-- N INVENTORY_BATCHES
+    KITCHENS -> R_batch_kit [label="1", fontsize=8];
+    R_batch_kit -> INVENTORY_BATCHES [label="N", fontsize=8];
+
+    // KITCHENS 1 --[bekerja di]-- N STAFF
+    KITCHENS -> R_staff_kit [label="1", fontsize=8];
+    R_staff_kit -> STAFF [label="N", fontsize=8];
+
+    // KITCHENS 1 --[rencana produksi]-- N PRODUCTION_PLANS
+    KITCHENS -> R_pp_kit [label="1", fontsize=8];
+    R_pp_kit -> PRODUCTION_PLANS [label="N", fontsize=8];
+
+    // MENUS 1 --[menggunakan menu]-- N PRODUCTION_PLANS
+    MENUS -> R_pp_menu [label="1", fontsize=8];
+    R_pp_menu -> PRODUCTION_PLANS [label="N", fontsize=8];
+
+    // KITCHENS 1 --[mencatat log]-- N PRODUCTION_LOGS
+    KITCHENS -> R_pl_kit [label="1", fontsize=8];
+    R_pl_kit -> PRODUCTION_LOGS [label="N", fontsize=8];
+
+    // KITCHENS 1 --[menerima notif]-- N NOTIFICATIONS
+    KITCHENS -> R_notif_kit [label="1", fontsize=8];
+    R_notif_kit -> NOTIFICATIONS [label="N", fontsize=8];
+
+    // KITCHENS 1 --[verifikasi stok]-- N STOCK_VERIFICATIONS
+    KITCHENS -> R_sv_kit [label="1", fontsize=8];
+    R_sv_kit -> STOCK_VERIFICATIONS [label="N", fontsize=8];
+
+    // ==============================================================
+    //  LAYOUT HINTS (rank groups for tidy arrangement)
+    // ==============================================================
+
+    // Tier 1: Parent entities
+    {rank=same; MENUS; KITCHENS; INVENTORY}
+
+    // Tier 3: Child entities (connected via relationships)
+    {rank=same; INGREDIENTS; STAFF; INVENTORY_BATCHES}
+
+    // Tier 5: Bottom entities
+    {rank=same; PRODUCTION_PLANS; PRODUCTION_LOGS; NOTIFICATIONS; STOCK_VERIFICATIONS}
+
+    // Standalone entities (no FK)
+    {rank=same; STOCK_REQUESTS; WASTAGE_RECORDS}
+
+    // Invisible edges for horizontal ordering of Tier 1
+    MENUS -> KITCHENS [style=invis];
+    KITCHENS -> INVENTORY [style=invis];
+
+    // Invisible edges for horizontal ordering of bottom tier
+    PRODUCTION_PLANS -> PRODUCTION_LOGS [style=invis];
+    PRODUCTION_LOGS -> NOTIFICATIONS [style=invis];
+    NOTIFICATIONS -> STOCK_VERIFICATIONS [style=invis];
+
+    // Place standalone entities at same level as bottom
+    STOCK_VERIFICATIONS -> STOCK_REQUESTS [style=invis];
+    STOCK_REQUESTS -> WASTAGE_RECORDS [style=invis];
 }
-
-skinparam usecase {
-  BackgroundColor #FCF3CF
-  BorderColor #F39C12
-  FontColor #7D6608
-  FontSize 9
-}
-
-skinparam component {
-  BackgroundColor #FADBD8
-  BorderColor #E74C3C
-  FontColor #922B21
-  FontStyle bold
-}
-
-'======================================================================
-' ENTITAS (Rectangle)
-'======================================================================
-rectangle "KITCHENS" as E_KITCHENS
-rectangle "MENUS" as E_MENUS
-rectangle "INGREDIENTS" as E_INGREDIENTS
-rectangle "INVENTORY" as E_INVENTORY
-rectangle "INVENTORY_BATCHES" as E_INV_BATCHES
-rectangle "STAFF" as E_STAFF
-rectangle "PRODUCTION_PLANS" as E_PROD_PLANS
-rectangle "PRODUCTION_LOGS" as E_PROD_LOGS
-rectangle "STOCK_REQUESTS" as E_STOCK_REQ
-rectangle "WASTAGE_RECORDS" as E_WASTAGE
-rectangle "NOTIFICATIONS" as E_NOTIF
-rectangle "STOCK_VERIFICATIONS" as E_STOCK_VERIF
-
-'======================================================================
-' ATRIBUT - KITCHENS
-'======================================================================
-usecase "<u>id</u>" as K_id
-usecase "name" as K_name
-usecase "address" as K_addr
-usecase "capacity" as K_cap
-usecase "city" as K_city
-usecase "latitude" as K_lat
-usecase "longitude" as K_long
-usecase "maps_url" as K_maps
-
-K_id -- E_KITCHENS
-K_name -- E_KITCHENS
-K_addr -- E_KITCHENS
-K_cap -- E_KITCHENS
-K_city -- E_KITCHENS
-K_lat -- E_KITCHENS
-K_long -- E_KITCHENS
-K_maps -- E_KITCHENS
-
-'======================================================================
-' ATRIBUT - MENUS
-'======================================================================
-usecase "<u>id</u>" as M_id
-usecase "name" as M_name
-
-M_id -- E_MENUS
-M_name -- E_MENUS
-
-'======================================================================
-' ATRIBUT - INGREDIENTS
-'======================================================================
-usecase "<u>id</u>" as I_id
-usecase "menuId (FK)" as I_menuId
-usecase "name" as I_name
-usecase "perPortion" as I_perP
-usecase "unit" as I_unit
-
-I_id -- E_INGREDIENTS
-I_menuId -- E_INGREDIENTS
-I_name -- E_INGREDIENTS
-I_perP -- E_INGREDIENTS
-I_unit -- E_INGREDIENTS
-
-'======================================================================
-' ATRIBUT - INVENTORY
-'======================================================================
-usecase "<u>id</u>" as INV_id
-usecase "name" as INV_name
-usecase "logistics_sku" as INV_sku
-usecase "base_unit" as INV_base
-usecase "has_packaging" as INV_hasPkg
-usecase "packaging_name" as INV_pkgName
-usecase "packaging_capacity" as INV_pkgCap
-
-INV_id -- E_INVENTORY
-INV_name -- E_INVENTORY
-INV_sku -- E_INVENTORY
-INV_base -- E_INVENTORY
-INV_hasPkg -- E_INVENTORY
-INV_pkgName -- E_INVENTORY
-INV_pkgCap -- E_INVENTORY
-
-'======================================================================
-' ATRIBUT - INVENTORY_BATCHES
-'======================================================================
-usecase "<u>id</u>" as IB_id
-usecase "inventoryId (FK)" as IB_invId
-usecase "kitchenId (FK)" as IB_kitId
-usecase "container" as IB_cont
-usecase "weight" as IB_weight
-usecase "qty_packed" as IB_qtyP
-usecase "qty_loose" as IB_qtyL
-usecase "unit" as IB_unit
-usecase "package_capacity" as IB_pkgCap
-usecase "package_unit" as IB_pkgUnit
-usecase "expiry" as IB_exp
-
-IB_id -- E_INV_BATCHES
-IB_invId -- E_INV_BATCHES
-IB_kitId -- E_INV_BATCHES
-IB_cont -- E_INV_BATCHES
-IB_weight -- E_INV_BATCHES
-IB_qtyP -- E_INV_BATCHES
-IB_qtyL -- E_INV_BATCHES
-IB_unit -- E_INV_BATCHES
-IB_pkgCap -- E_INV_BATCHES
-IB_pkgUnit -- E_INV_BATCHES
-IB_exp -- E_INV_BATCHES
-
-'======================================================================
-' ATRIBUT - STAFF
-'======================================================================
-usecase "<u>id</u>" as S_id
-usecase "name" as S_name
-usecase "role" as S_role
-usecase "status" as S_status
-usecase "avatar" as S_avatar
-usecase "kitchenId (FK)" as S_kitId
-usecase "email" as S_email
-usecase "password" as S_pass
-
-S_id -- E_STAFF
-S_name -- E_STAFF
-S_role -- E_STAFF
-S_status -- E_STAFF
-S_avatar -- E_STAFF
-S_kitId -- E_STAFF
-S_email -- E_STAFF
-S_pass -- E_STAFF
-
-'======================================================================
-' ATRIBUT - PRODUCTION_PLANS
-'======================================================================
-usecase "<u>id</u>" as PP_id
-usecase "day" as PP_day
-usecase "menuId (FK)" as PP_menuId
-usecase "menuName" as PP_menuName
-usecase "kitchenId (FK)" as PP_kitId
-usecase "kitchenName" as PP_kitName
-usecase "portions" as PP_portions
-usecase "note" as PP_note
-usecase "status" as PP_status
-usecase "chefPenanggungJawab" as PP_chef
-
-PP_id -- E_PROD_PLANS
-PP_day -- E_PROD_PLANS
-PP_menuId -- E_PROD_PLANS
-PP_menuName -- E_PROD_PLANS
-PP_kitId -- E_PROD_PLANS
-PP_kitName -- E_PROD_PLANS
-PP_portions -- E_PROD_PLANS
-PP_note -- E_PROD_PLANS
-PP_status -- E_PROD_PLANS
-PP_chef -- E_PROD_PLANS
-
-'======================================================================
-' ATRIBUT - PRODUCTION_LOGS
-'======================================================================
-usecase "<u>id</u>" as PL_id
-usecase "kitchenId (FK)" as PL_kitId
-usecase "kitchen" as PL_kitchen
-usecase "menu" as PL_menu
-usecase "servings" as PL_servings
-usecase "city" as PL_city
-usecase "startTime" as PL_start
-usecase "qaNotes" as PL_qa
-usecase "status" as PL_status
-
-PL_id -- E_PROD_LOGS
-PL_kitId -- E_PROD_LOGS
-PL_kitchen -- E_PROD_LOGS
-PL_menu -- E_PROD_LOGS
-PL_servings -- E_PROD_LOGS
-PL_city -- E_PROD_LOGS
-PL_start -- E_PROD_LOGS
-PL_qa -- E_PROD_LOGS
-PL_status -- E_PROD_LOGS
-
-'======================================================================
-' ATRIBUT - STOCK_REQUESTS
-'======================================================================
-usecase "<u>id</u>" as SR_id
-usecase "material" as SR_mat
-usecase "amount" as SR_amount
-usecase "urgency" as SR_urgency
-usecase "status" as SR_status
-usecase "createdAt" as SR_created
-usecase "kitchenId (FK)" as SR_kitId
-usecase "kitchenName" as SR_kitName
-usecase "supplierKitchenId" as SR_supId
-usecase "supplierKitchenName" as SR_supName
-usecase "adminNotes" as SR_notes
-
-SR_id -- E_STOCK_REQ
-SR_mat -- E_STOCK_REQ
-SR_amount -- E_STOCK_REQ
-SR_urgency -- E_STOCK_REQ
-SR_status -- E_STOCK_REQ
-SR_created -- E_STOCK_REQ
-SR_kitId -- E_STOCK_REQ
-SR_kitName -- E_STOCK_REQ
-SR_supId -- E_STOCK_REQ
-SR_supName -- E_STOCK_REQ
-SR_notes -- E_STOCK_REQ
-
-'======================================================================
-' ATRIBUT - WASTAGE_RECORDS
-'======================================================================
-usecase "<u>id</u>" as W_id
-usecase "kitchen" as W_kitchen
-usecase "city" as W_city
-usecase "material" as W_mat
-usecase "weight" as W_weight
-usecase "unit" as W_unit
-usecase "reason" as W_reason
-usecase "cost" as W_cost
-usecase "date" as W_date
-
-W_id -- E_WASTAGE
-W_kitchen -- E_WASTAGE
-W_city -- E_WASTAGE
-W_mat -- E_WASTAGE
-W_weight -- E_WASTAGE
-W_unit -- E_WASTAGE
-W_reason -- E_WASTAGE
-W_cost -- E_WASTAGE
-W_date -- E_WASTAGE
-
-'======================================================================
-' ATRIBUT - NOTIFICATIONS
-'======================================================================
-usecase "<u>id</u>" as N_id
-usecase "kitchenId (FK)" as N_kitId
-usecase "message" as N_msg
-usecase "isRead" as N_read
-usecase "createdAt" as N_created
-
-N_id -- E_NOTIF
-N_kitId -- E_NOTIF
-N_msg -- E_NOTIF
-N_read -- E_NOTIF
-N_created -- E_NOTIF
-
-'======================================================================
-' ATRIBUT - STOCK_VERIFICATIONS
-'======================================================================
-usecase "<u>id</u>" as SV_id
-usecase "kitchenId (FK)" as SV_kitId
-usecase "verifiedAt" as SV_at
-usecase "verifiedBy" as SV_by
-usecase "details" as SV_det
-
-SV_id -- E_STOCK_VERIF
-SV_kitId -- E_STOCK_VERIF
-SV_at -- E_STOCK_VERIF
-SV_by -- E_STOCK_VERIF
-SV_det -- E_STOCK_VERIF
-
-'======================================================================
-' RELATIONSHIP (Diamond) - Menggunakan component untuk bentuk berlian
-'======================================================================
-component "Memiliki" as R_MENU_ING <<relationship>>
-component "Memiliki" as R_INV_BATCH <<relationship>>
-component "Disimpan di" as R_BATCH_KIT <<relationship>>
-component "Bekerja di" as R_STAFF_KIT <<relationship>>
-component "Dilakukan di" as R_PP_KIT <<relationship>>
-component "Menggunakan" as R_PP_MENU <<relationship>>
-component "Dilakukan di" as R_PL_KIT <<relationship>>
-component "Dikirim ke" as R_NOTIF_KIT <<relationship>>
-component "Dilakukan di" as R_SV_KIT <<relationship>>
-
-'======================================================================
-' KONEKSI RELATIONSHIP (dengan Kardinalitas)
-'======================================================================
-
-' Menus 1 --- N Ingredients
-E_MENUS "1" == R_MENU_ING
-R_MENU_ING == "N" E_INGREDIENTS
-
-' Inventory 1 --- N Inventory_Batches
-E_INVENTORY "1" == R_INV_BATCH
-R_INV_BATCH == "N" E_INV_BATCHES
-
-' Kitchens 1 --- N Inventory_Batches
-E_KITCHENS "1" == R_BATCH_KIT
-R_BATCH_KIT == "N" E_INV_BATCHES
-
-' Kitchens 1 --- N Staff
-E_KITCHENS "1" == R_STAFF_KIT
-R_STAFF_KIT == "N" E_STAFF
-
-' Kitchens 1 --- N Production_Plans
-E_KITCHENS "1" == R_PP_KIT
-R_PP_KIT == "N" E_PROD_PLANS
-
-' Menus 1 --- N Production_Plans
-E_MENUS "1" == R_PP_MENU
-R_PP_MENU == "N" E_PROD_PLANS
-
-' Kitchens 1 --- N Production_Logs
-E_KITCHENS "1" == R_PL_KIT
-R_PL_KIT == "N" E_PROD_LOGS
-
-' Kitchens 1 --- N Notifications
-E_KITCHENS "1" == R_NOTIF_KIT
-R_NOTIF_KIT == "N" E_NOTIF
-
-' Kitchens 1 --- N Stock_Verifications
-E_KITCHENS "1" == R_SV_KIT
-R_SV_KIT == "N" E_STOCK_VERIF
-
-'======================================================================
-' LEGEND
-'======================================================================
-legend bottom left
-  |= Simbol |= Keterangan |
-  | <#D6EAF8> Rectangle | Entitas |
-  | <#FCF3CF> Oval | Atribut |
-  | <#FADBD8> Component | Relationship (Diamond) |
-  | <u>underline</u> | Primary Key |
-  | (FK) | Foreign Key |
-  | 1 --- N | Kardinalitas One-to-Many |
-endlegend
-
-title ERD Chen's Notation\nSistem MBGflow - Manajemen Dapur & Inventaris
-
-footer Generated from backend/src/config/db.js | MBGflow
-
-@enduml
+@enddot

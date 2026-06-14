@@ -10,9 +10,25 @@ async function getActivity(req, res) {
   try {
     let rows;
     if (kitchenId) {
-      [rows] = await db.query('SELECT * FROM production_logs WHERE kitchenId = ?', [kitchenId]);
+      [rows] = await db.query(
+        `SELECT pl.*, m.name as menu, k.name as kitchen, k.city, u.name as chefPenanggungJawab
+         FROM production_logs pl
+         JOIN menus m ON pl.menuId = m.id
+         JOIN kitchens k ON pl.kitchenId = k.id
+         LEFT JOIN production_plans pp ON pl.id = pp.id
+         LEFT JOIN users u ON pp.userId = u.id
+         WHERE pl.kitchenId = ?`,
+        [kitchenId]
+      );
     } else {
-      [rows] = await db.query('SELECT * FROM production_logs');
+      [rows] = await db.query(
+        `SELECT pl.*, m.name as menu, k.name as kitchen, k.city, u.name as chefPenanggungJawab
+         FROM production_logs pl
+         JOIN menus m ON pl.menuId = m.id
+         JOIN kitchens k ON pl.kitchenId = k.id
+         LEFT JOIN production_plans pp ON pl.id = pp.id
+         LEFT JOIN users u ON pp.userId = u.id`
+      );
     }
     res.json(rows);
   } catch (error) {
@@ -27,9 +43,23 @@ async function getProductionPlans(req, res) {
   try {
     let rows;
     if (kitchenId) {
-      [rows] = await db.query('SELECT * FROM production_plans WHERE kitchenId = ?', [kitchenId]);
+      [rows] = await db.query(
+        `SELECT pp.*, m.name as menuName, k.name as kitchenName, u.name as chefPenanggungJawab
+         FROM production_plans pp
+         JOIN menus m ON pp.menuId = m.id
+         JOIN kitchens k ON pp.kitchenId = k.id
+         LEFT JOIN users u ON pp.userId = u.id
+         WHERE pp.kitchenId = ?`,
+        [kitchenId]
+      );
     } else {
-      [rows] = await db.query('SELECT * FROM production_plans');
+      [rows] = await db.query(
+        `SELECT pp.*, m.name as menuName, k.name as kitchenName, u.name as chefPenanggungJawab
+         FROM production_plans pp
+         JOIN menus m ON pp.menuId = m.id
+         JOIN kitchens k ON pp.kitchenId = k.id
+         LEFT JOIN users u ON pp.userId = u.id`
+      );
     }
     res.json(rows);
   } catch (error) {
@@ -63,19 +93,20 @@ async function createProductionPlan(req, res) {
     }
     const menuData = menus[0];
 
-    const [chefs] = await connection.query("SELECT name FROM staff WHERE kitchenId = ? AND role = 'Chef' LIMIT 1", [kitchenId]);
+    const [chefs] = await connection.query("SELECT id, name FROM users WHERE kitchenId = ? AND role = 'Chef' LIMIT 1", [kitchenId]);
+    const chefId = chefs.length > 0 ? chefs[0].id : null;
     const chefName = chefs.length > 0 ? chefs[0].name : '';
 
     const planId = id || `p${Date.now()}`;
 
     await connection.query(
-      'INSERT INTO production_plans (id, day, menuId, menuName, kitchenId, kitchenName, portions, note, status, chefPenanggungJawab) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [planId, day, menuData.id, menuData.name, kitchen.id, kitchen.name, Number(portions), note || '', 'Pending', chefName]
+      'INSERT INTO production_plans (id, day, menuId, kitchenId, portions, note, status, userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [planId, day, menuData.id, kitchen.id, Number(portions), note || '', 'Pending', chefId]
     );
 
     await connection.query(
-      'INSERT INTO production_logs (id, kitchenId, kitchen, menu, servings, city, startTime, qaNotes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [planId, kitchen.id, kitchen.name, menuData.name, Number(portions), kitchen.city || 'Jakarta', new Date().toISOString(), note || '', 'Pending']
+      'INSERT INTO production_logs (id, kitchenId, menuId, servings, startTime, endTime, qaNotes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [planId, kitchen.id, menuData.id, Number(portions), null, null, note || '', 'Pending']
     );
 
     await checkAndNotifyShortage(planId, connection);
@@ -112,7 +143,14 @@ async function updateProductionPlan(req, res) {
   try {
     await connection.beginTransaction();
 
-    const [existing] = await connection.query('SELECT * FROM production_plans WHERE id = ?', [id]);
+    const [existing] = await connection.query(
+      `SELECT pp.*, m.name as menuName, k.name as kitchenName
+       FROM production_plans pp
+       JOIN menus m ON pp.menuId = m.id
+       JOIN kitchens k ON pp.kitchenId = k.id
+       WHERE pp.id = ?`,
+      [id]
+    );
     if (existing.length === 0) {
       connection.release();
       return res.status(404).json({ error: 'Rencana produksi tidak ditemukan.' });
@@ -139,20 +177,28 @@ async function updateProductionPlan(req, res) {
     }
     const menuData = menus[0];
 
-    let chefName = current.chefPenanggungJawab;
+    let userId = current.userId;
+    let chefName = '';
     if (mergedKitchenId !== current.kitchenId) {
-      const [chefs] = await connection.query("SELECT name FROM staff WHERE kitchenId = ? AND role = 'Chef' LIMIT 1", [mergedKitchenId]);
+      const [chefs] = await connection.query("SELECT id, name FROM users WHERE kitchenId = ? AND role = 'Chef' LIMIT 1", [mergedKitchenId]);
+      userId = chefs.length > 0 ? chefs[0].id : null;
       chefName = chefs.length > 0 ? chefs[0].name : '';
+    } else {
+      // Get current chef name
+      if (userId) {
+        const [chefRows] = await connection.query('SELECT name FROM users WHERE id = ?', [userId]);
+        chefName = chefRows.length > 0 ? chefRows[0].name : '';
+      }
     }
 
     await connection.query(
-      'UPDATE production_plans SET day = ?, menuId = ?, menuName = ?, kitchenId = ?, kitchenName = ?, portions = ?, note = ?, chefPenanggungJawab = ? WHERE id = ?',
-      [mergedDay, menuData.id, menuData.name, kitchen.id, kitchen.name, mergedPortions, mergedNote || '', chefName, id]
+      'UPDATE production_plans SET day = ?, menuId = ?, kitchenId = ?, portions = ?, note = ?, userId = ? WHERE id = ?',
+      [mergedDay, menuData.id, kitchen.id, mergedPortions, mergedNote || '', userId, id]
     );
 
     await connection.query(
-      'UPDATE production_logs SET kitchenId = ?, kitchen = ?, menu = ?, servings = ?, city = ?, qaNotes = ? WHERE id = ?',
-      [kitchen.id, kitchen.name, menuData.name, mergedPortions, kitchen.city || 'Jakarta', mergedNote || '', id]
+      'UPDATE production_logs SET kitchenId = ?, menuId = ?, servings = ?, qaNotes = ? WHERE id = ?',
+      [kitchen.id, menuData.id, mergedPortions, mergedNote || '', id]
     );
 
     await checkAndNotifyShortage(id, connection);
@@ -214,7 +260,8 @@ async function finishProductionLog(req, res) {
   const { productionId } = req.body;
 
   try {
-    await db.query("UPDATE production_logs SET status = 'Ready' WHERE id = ?", [productionId]);
+    const endTime = new Date().toISOString();
+    await db.query("UPDATE production_logs SET status = 'Ready', endTime = ? WHERE id = ?", [endTime, productionId]);
     await db.query("UPDATE production_plans SET status = 'Ready' WHERE id = ?", [productionId]);
 
     res.json({ success: true, handoverId: `H-${Date.now()}` });
@@ -232,7 +279,13 @@ async function startProductionLog(req, res) {
   try {
     await connection.beginTransaction();
 
-    const [tasks] = await connection.query('SELECT * FROM production_logs WHERE id = ?', [id]);
+    const [tasks] = await connection.query(
+      `SELECT pl.*, m.name as menuName
+       FROM production_logs pl
+       JOIN menus m ON pl.menuId = m.id
+       WHERE pl.id = ?`,
+      [id]
+    );
     if (tasks.length === 0) {
       connection.release();
       return res.status(404).json({ error: 'Task not found.' });
@@ -244,7 +297,8 @@ async function startProductionLog(req, res) {
     await connection.query("UPDATE production_logs SET status = 'Cooking', startTime = ? WHERE id = ?", [startTime, id]);
     await connection.query("UPDATE production_plans SET status = 'Cooking' WHERE id = ?", [id]);
 
-    const [menus] = await connection.query('SELECT * FROM menus WHERE LOWER(name) = ?', [plan.menu.toLowerCase()]);
+    // Deduct ingredients from inventory
+    const [menus] = await connection.query('SELECT * FROM menus WHERE id = ?', [plan.menuId]);
     if (menus.length > 0) {
       const menu = menus[0];
       const [ingredients] = await connection.query('SELECT * FROM ingredients WHERE menuId = ?', [menu.id]);
@@ -311,7 +365,8 @@ async function startProductionLog(req, res) {
     await connection.commit();
     connection.release();
 
-    res.json({ ...plan, status: 'Cooking', startTime });
+    // Return response with menu name for frontend compatibility
+    res.json({ ...plan, status: 'Cooking', startTime, menu: plan.menuName });
   } catch (error) {
     await connection.rollback();
     connection.release();
@@ -348,7 +403,13 @@ async function getMenus(req, res) {
 
 async function checkAndNotifyShortage(planId, connection) {
   try {
-    const [plans] = await connection.query('SELECT * FROM production_plans WHERE id = ?', [planId]);
+    const [plans] = await connection.query(
+      `SELECT pp.*, m.name as menuName
+       FROM production_plans pp
+       JOIN menus m ON pp.menuId = m.id
+       WHERE pp.id = ?`,
+      [planId]
+    );
     if (plans.length === 0) return;
     const plan = plans[0];
 

@@ -34,7 +34,11 @@ async function getLastCookedMenu(req, res) {
   try {
     // 1. Get the last completed production log for this kitchen
     const [logs] = await db.query(
-      "SELECT * FROM production_logs WHERE kitchenId = ? AND status = 'Ready' ORDER BY startTime DESC LIMIT 1",
+      `SELECT pl.*, m.name as menuName
+       FROM production_logs pl
+       JOIN menus m ON pl.menuId = m.id
+       WHERE pl.kitchenId = ? AND pl.status = 'Ready'
+       ORDER BY pl.startTime DESC LIMIT 1`,
       [kitchenId]
     );
 
@@ -42,13 +46,10 @@ async function getLastCookedMenu(req, res) {
     let detailedIngredientNames = [];
 
     if (logs.length > 0) {
-      lastMenu = logs[0].menu;
-      // Find the menu to get its ingredients
-      const [menus] = await db.query('SELECT id FROM menus WHERE LOWER(name) = ?', [lastMenu.toLowerCase()]);
-      if (menus.length > 0) {
-        const [ingredients] = await db.query('SELECT name FROM ingredients WHERE menuId = ?', [menus[0].id]);
-        detailedIngredientNames = ingredients.map(ing => ing.name.toLowerCase());
-      }
+      lastMenu = logs[0].menuName;
+      // Use menuId directly to get ingredients
+      const [ingredients] = await db.query('SELECT name FROM ingredients WHERE menuId = ?', [logs[0].menuId]);
+      detailedIngredientNames = ingredients.map(ing => ing.name.toLowerCase());
     }
 
     // 2. Fetch all inventory batches in this kitchen

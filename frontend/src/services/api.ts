@@ -103,24 +103,36 @@ export const api = {
   getMenus: async (): Promise<any[]> => {
     return request<any[]>("/menus");
   },
-
+  getUsers: async (): Promise<any[]> => {
+    return request<any[]>("/users");
+  },
   getStaff: async (): Promise<any[]> => {
-    return request<any[]>("/staff");
+    return request<any[]>("/users");
   },
 
+  updateUser: async (id: string, data: { name?: string; email?: string; role?: string; password?: string }): Promise<any> => {
+    return request<any>(`/users/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
   updateStaff: async (id: string, data: { name?: string; email?: string; role?: string; password?: string }): Promise<any> => {
-    return request<any>(`/staff/${encodeURIComponent(id)}`, {
+    return request<any>(`/users/${encodeURIComponent(id)}`, {
       method: "PUT",
       body: JSON.stringify(data),
     });
   },
 
-  deleteStaff: async (id: string): Promise<any> => {
-    return request<any>(`/staff/${encodeURIComponent(id)}`, {
+  deleteUser: async (id: string): Promise<any> => {
+    return request<any>(`/users/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
   },
-
+  deleteStaff: async (id: string): Promise<any> => {
+    return request<any>(`/users/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
   parseMapsUrl: async (url: string): Promise<{ success: boolean; latitude: number; longitude: number; address?: string }> => {
     return request<{ success: boolean; latitude: number; longitude: number; address?: string }>("/kitchens/parse-maps-url", {
       method: "POST",
@@ -161,17 +173,17 @@ export const api = {
     });
   },
 
-  requestStock: async (material: string, amount: string, urgency: string, kitchenId?: string, kitchenName?: string, supplierKitchenId?: string, supplierKitchenName?: string): Promise<any> => {
+  requestStock: async (material: string, amount: string, urgency: string, kitchenId?: string, supplierKitchenId?: string): Promise<any> => {
     return request<any>("/stock-requests", {
       method: "POST",
-      body: JSON.stringify({ material, amount, urgency, kitchenId, kitchenName, supplierKitchenId, supplierKitchenName }),
+      body: JSON.stringify({ material, amount, urgency, kitchenId, supplierKitchenId }),
     });
   },
 
-  requestStockBatch: async (requests: { material: string; amount: string; urgency: string; supplierKitchenId?: string; supplierKitchenName?: string }[], kitchenId?: string, kitchenName?: string): Promise<any[]> => {
+  requestStockBatch: async (requests: { material: string; amount: string; urgency: string; supplierKitchenId?: string }[], kitchenId?: string): Promise<any[]> => {
     return request<any[]>("/stock-requests/batch", {
       method: "POST",
-      body: JSON.stringify({ requests, kitchenId, kitchenName }),
+      body: JSON.stringify({ requests, kitchenId }),
     });
   },
 

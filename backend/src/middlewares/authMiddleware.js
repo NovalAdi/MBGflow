@@ -15,7 +15,7 @@ async function protect(req, res, next) {
       const decoded = jwt.verify(token, JWT_SECRET);
 
       // Get user from the database
-      const [rows] = await db.query('SELECT id, name, role, email, status, avatar, kitchenId FROM staff WHERE id = ?', [decoded.id]);
+      const [rows] = await db.query('SELECT id, name, role, email, status, avatar, kitchenId FROM users WHERE id = ?', [decoded.id]);
 
       if (rows.length === 0) {
         return res.status(401).json({ error: 'Tidak terotorisasi, pengguna tidak ditemukan.' });

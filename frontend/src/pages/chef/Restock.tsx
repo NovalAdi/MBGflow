@@ -441,9 +441,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
         amount,
         urgency,
         kitchenId,
-        kitchenName,
-        supplierId,
-        supplierName
+        supplierId
       );
 
       if (sourceNotificationId) {
@@ -482,7 +480,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
         };
       });
 
-      await api.requestStockBatch(requests, user.kitchenId, kitchenDetail?.name);
+      await api.requestStockBatch(requests, user.kitchenId);
 
       if (sourceNotificationId) {
         try {
@@ -606,7 +604,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
         };
       });
 
-      await api.requestStockBatch(requests, user.kitchenId, kitchenDetail?.name);
+      await api.requestStockBatch(requests, user.kitchenId);
 
       if (sourceNotificationId) {
         try {
