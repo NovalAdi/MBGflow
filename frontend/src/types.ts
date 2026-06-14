@@ -5,6 +5,10 @@ export interface Kitchen {
   name: string;
   address: string;
   capacity: number;
+  latitude?: number;
+  longitude?: number;
+  maps_url?: string;
+  city?: string;
 }
 
 export interface MenuItemIngredient {

@@ -88,7 +88,8 @@ async function createTables() {
         capacity INT,
         city VARCHAR(100),
         latitude DECIMAL(10, 8) NULL,
-        longitude DECIMAL(11, 8) NULL
+        longitude DECIMAL(11, 8) NULL,
+        maps_url TEXT NULL
       );
     `);
 
@@ -268,14 +269,14 @@ async function seedDatabase() {
     // 1. KITCHENS
     // =========================================================================
     const kitchens = [
-      { id: 'k1', name: 'Dapur Pusat Jakarta', address: 'Grogol, Jakarta Barat', capacity: 5000, city: 'Jakarta', latitude: -6.1668, longitude: 106.7865 },
-      { id: 'k2', name: 'Dapur Satelit Tangerang', address: 'BSD, Tangerang Selatan', capacity: 2500, city: 'Tangerang', latitude: -6.3024, longitude: 106.6522 },
-      { id: 'k3', name: 'Production Hub Bandung', address: 'Dago, Bandung', capacity: 3000, city: 'Bandung', latitude: -6.8915, longitude: 107.6106 },
+      { id: 'k1', name: 'Dapur Pusat Jakarta', address: 'Grogol, Jakarta Barat', capacity: 5000, city: 'Jakarta', latitude: -6.1668, longitude: 106.7865, maps_url: 'https://www.google.com/maps/place/Grogol,+West+Jakarta+City,+Jakarta/@-6.1668,106.7865,15z' },
+      { id: 'k2', name: 'Dapur Satelit Tangerang', address: 'BSD, Tangerang Selatan', capacity: 2500, city: 'Tangerang', latitude: -6.3024, longitude: 106.6522, maps_url: 'https://www.google.com/maps/place/BSD+City/@-6.3024,106.6522,15z' },
+      { id: 'k3', name: 'Production Hub Bandung', address: 'Dago, Bandung', capacity: 3000, city: 'Bandung', latitude: -6.8915, longitude: 107.6106, maps_url: 'https://www.google.com/maps/place/Dago,+Bandung+City,+West+Java/@-6.8915,107.6106,15z' },
     ];
     for (const k of kitchens) {
       await connection.query(
-        'INSERT INTO kitchens (id, name, address, capacity, city, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [k.id, k.name, k.address, k.capacity, k.city, k.latitude, k.longitude]
+        'INSERT INTO kitchens (id, name, address, capacity, city, latitude, longitude, maps_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [k.id, k.name, k.address, k.capacity, k.city, k.latitude, k.longitude, k.maps_url]
       );
     }
     console.log(`  ✓ ${kitchens.length} kitchens seeded`);
@@ -462,6 +463,9 @@ async function seedDatabase() {
       { id: 's_k3_1', name: 'Eko Prasetyo', role: 'Staff', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=eko', kitchenId: 'k3', email: 'eko.prasetyo@mbg.com', password: 'password' },
       { id: 's_k3_2', name: 'Yudi Hermawan', role: 'Staff', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=yudi', kitchenId: 'k3', email: 'yudi.hermawan@mbg.com', password: 'password' },
       { id: 's_k3_3', name: 'Dewi Lestari', role: 'Staff', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=dewi', kitchenId: 'k3', email: 'dewi.lestari@mbg.com', password: 'password' },
+      { id: 's_test_admin', name: 'Admin Test', role: 'Admin', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_admin', kitchenId: null, email: 'admin.test@mbg.com', password: 'password' },
+      { id: 's_test_chef', name: 'Head Chef Test', role: 'Head Chef', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_chef', kitchenId: null, email: 'chef.test@mbg.com', password: 'password' },
+      { id: 's_test_staff', name: 'Staff Test', role: 'Staff', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_staff', kitchenId: null, email: 'staff.test@mbg.com', password: 'password' },
     ];
     for (const staff of staffList) {
       const hashedPassword = await bcrypt.hash(staff.password, 10);

@@ -108,7 +108,27 @@ export const api = {
     return request<any[]>("/staff");
   },
 
-  createKitchen: async (data: Omit<Kitchen, "id"> & { city?: string }): Promise<Kitchen> => {
+  updateStaff: async (id: string, data: { name?: string; email?: string; role?: string; password?: string }): Promise<any> => {
+    return request<any>(`/staff/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteStaff: async (id: string): Promise<any> => {
+    return request<any>(`/staff/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+
+  parseMapsUrl: async (url: string): Promise<{ success: boolean; latitude: number; longitude: number; address?: string }> => {
+    return request<{ success: boolean; latitude: number; longitude: number; address?: string }>("/kitchens/parse-maps-url", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+  },
+
+  createKitchen: async (data: Omit<Kitchen, "id"> & { city?: string; staffIds?: string[] }): Promise<Kitchen> => {
     return request<Kitchen>("/kitchens", {
       method: "POST",
       body: JSON.stringify(data),
@@ -132,6 +152,13 @@ export const api = {
     return request<Kitchen & { staff: any[]; shifts: any[]; stock: InventoryItem[]; activeProductions: any[] }>(
       `/kitchens/${encodeURIComponent(id)}/detail`
     );
+  },
+
+  addKitchenStaff: async (kitchenId: string, data: { staffId?: string; name?: string; role?: string; email?: string; password?: string }): Promise<any> => {
+    return request<any>(`/kitchens/${encodeURIComponent(kitchenId)}/staff`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   },
 
   requestStock: async (material: string, amount: string, urgency: string, kitchenId?: string, kitchenName?: string, supplierKitchenId?: string, supplierKitchenName?: string): Promise<any> => {

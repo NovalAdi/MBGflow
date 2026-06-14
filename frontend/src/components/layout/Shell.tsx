@@ -1,4 +1,4 @@
-import { LayoutDashboard, Calendar, Wrench, ClipboardList, LogOut, PackageSearch, Menu, Hammer, User } from "lucide-react";
+import { LayoutDashboard, Calendar, Wrench, ClipboardList, LogOut, PackageSearch, Menu, Hammer, User, BarChart2 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/src/lib/utils";
 import { Button } from "../ui/Button";
@@ -18,7 +18,7 @@ const sidebarItems: SidebarItem[] = [
   { icon: Wrench, label: "Manajemen Dapur", path: "/admin/kitchens", roles: ['Admin'] },
   { icon: PackageSearch, label: "Permintaan Bahan", path: "/admin/request-stock", roles: ['Admin'] },
   { icon: ClipboardList, label: "Laporan Wastage", path: "/admin/reports", roles: ['Admin'] },
-  { icon: ClipboardList, label: "Rekap Harian", path: "/admin/daily-recap", roles: ['Admin'] },
+  { icon: BarChart2, label: "Rekap Harian", path: "/admin/daily-recap", roles: ['Admin'] },
   { icon: LayoutDashboard, label: "Dashboard Chef", path: "/chef/dashboard", roles: ['Chef'] },
   { icon: ClipboardList, label: "Antrean Masak", path: "/chef/queue", roles: ['Chef'] },
   { icon: PackageSearch, label: "Stok Dapur", path: "/chef/stock", roles: ['Chef'] },

@@ -67,7 +67,73 @@ async function getStaff(req, res) {
   }
 }
 
+async function updateStaff(req, res) {
+  await delay(100);
+  const { id } = req.params;
+  const { name, email, role, password } = req.body;
+
+  try {
+    const [rows] = await db.query('SELECT * FROM staff WHERE id = ?', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Staff member not found.' });
+    }
+
+    const current = rows[0];
+    
+    // Check if email already registered to someone else
+    if (email && email.toLowerCase() !== current.email.toLowerCase()) {
+      const [existing] = await db.query('SELECT * FROM staff WHERE LOWER(email) = ? AND id != ?', [email.toLowerCase(), id]);
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Email sudah terdaftar.' });
+      }
+    }
+
+    let passwordHash = current.password;
+    if (password) {
+      const bcrypt = require('bcryptjs');
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
+    const updated = {
+      name: name || current.name,
+      email: email ? email.toLowerCase() : current.email,
+      role: role || current.role,
+      password: passwordHash
+    };
+
+    await db.query(
+      'UPDATE staff SET name = ?, email = ?, role = ?, password = ? WHERE id = ?',
+      [updated.name, updated.email, updated.role, updated.password, id]
+    );
+
+    res.json({ success: true, message: 'Staff successfully updated.' });
+  } catch (error) {
+    console.error('Update staff error:', error);
+    res.status(500).json({ error: 'Server error updating staff.' });
+  }
+}
+
+async function deleteStaff(req, res) {
+  await delay(100);
+  const { id } = req.params;
+
+  try {
+    const [rows] = await db.query('SELECT * FROM staff WHERE id = ?', [id]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Staff member not found.' });
+    }
+
+    await db.query('UPDATE staff SET kitchenId = NULL WHERE id = ?', [id]);
+    res.json({ success: true, message: 'Staff successfully unassigned from kitchen.' });
+  } catch (error) {
+    console.error('Delete staff error:', error);
+    res.status(500).json({ error: 'Server error deleting/unassigning staff.' });
+  }
+}
+
 module.exports = {
   login,
-  getStaff
+  getStaff,
+  updateStaff,
+  deleteStaff
 };

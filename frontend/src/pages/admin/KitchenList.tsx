@@ -19,6 +19,14 @@ export const KitchenList = () => {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [sortBy, setSortBy] = React.useState<"name" | "capacity-desc" | "capacity-asc">("name");
 
+  // New states for staff assignment & Maps parsing
+  const [unassignedStaff, setUnassignedStaff] = React.useState<any[]>([]);
+  const [selectedStaffIds, setSelectedStaffIds] = React.useState<string[]>([]);
+  const [isResolvingMaps, setIsResolvingMaps] = React.useState(false);
+  const [mapsError, setMapsError] = React.useState<string | null>(null);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = React.useState(false);
+  const [newKitchenDetails, setNewKitchenDetails] = React.useState<any>(null);
+
   const todayIndex = new Date().getDay();
   let todayDayName = INDO_DAYS[todayIndex];
   if (todayDayName === "Minggu") {
@@ -41,9 +49,58 @@ export const KitchenList = () => {
     }
   }, []);
 
+  const fetchStaff = React.useCallback(async () => {
+    try {
+      const staffList = await api.getStaff();
+      // Filter unassigned staff
+      const unassigned = staffList.filter(s => !s.kitchenId);
+      setUnassignedStaff(unassigned);
+
+      // Pre-select test accounts if they exist and are unassigned
+      const defaultToSelect = unassigned
+        .filter(s => ['s_test_admin', 's_test_chef', 's_test_staff'].includes(s.id))
+        .map(s => s.id);
+      setSelectedStaffIds(defaultToSelect);
+    } catch (error) {
+      console.error("Failed to fetch staff list", error);
+    }
+  }, []);
+
   React.useEffect(() => {
     fetchKitchens();
-  }, [fetchKitchens]);
+    fetchStaff();
+  }, [fetchKitchens, fetchStaff]);
+
+  const handleAddressChange = async (val: string) => {
+    setCurrentKitchen(prev => ({ ...prev ? { ...prev, address: val } : { address: val } }));
+    setMapsError(null);
+
+    // Detect if it is a Google Maps link
+    const isMapsLink = val.includes("maps.app.goo.gl") || 
+                       val.includes("goo.gl/maps") || 
+                       val.includes("google.com/maps");
+
+    if (isMapsLink) {
+      setIsResolvingMaps(true);
+      try {
+        const result = await api.parseMapsUrl(val);
+        if (result.success) {
+          setCurrentKitchen(prev => ({
+            ...prev,
+            address: result.address || val,
+            latitude: result.latitude,
+            longitude: result.longitude,
+            maps_url: val
+          }));
+        }
+      } catch (err: any) {
+        console.error("Maps parsing failed", err);
+        setMapsError(err.message || "Gagal mendeteksi koordinat Google Maps.");
+      } finally {
+        setIsResolvingMaps(false);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +110,17 @@ export const KitchenList = () => {
       if (currentKitchen.id) {
         await api.updateKitchen(currentKitchen.id, currentKitchen);
       } else {
-        await api.createKitchen(currentKitchen as Omit<Kitchen, 'id'>);
+        const created = await api.createKitchen({
+          ...(currentKitchen as Omit<Kitchen, 'id'>),
+          staffIds: selectedStaffIds
+        });
+        setNewKitchenDetails({
+          name: created.name,
+          address: created.address,
+          capacity: created.capacity,
+          staff: unassignedStaff.filter(s => selectedStaffIds.includes(s.id))
+        });
+        setIsSuccessModalOpen(true);
       }
       setIsModalOpen(false);
       setCurrentKitchen(null);
@@ -95,7 +162,12 @@ export const KitchenList = () => {
           <p className="text-slate-600 font-bold text-[11px] uppercase tracking-widest mt-2 px-1">Kelola Seluruh Lokasi Central Kitchen</p>
         </div>
         <Button 
-          onClick={() => { setCurrentKitchen({ name: "", address: "", capacity: 1000 }); setIsModalOpen(true); }}
+          onClick={() => { 
+            setCurrentKitchen({ name: "", address: "", capacity: 1000 }); 
+            setMapsError(null);
+            fetchStaff();
+            setIsModalOpen(true); 
+          }}
           className="shadow-2xl shadow-primary/20 rounded-[20px] py-4 px-8 font-black uppercase tracking-widest text-xs"
         >
           <Plus className="w-5 h-5 mr-3" />
@@ -236,12 +308,35 @@ export const KitchenList = () => {
               <input 
                 type="text" 
                 className="w-full bg-slate-50 border-2 border-transparent rounded-[20px] pl-14 pr-6 py-4 focus:bg-white focus:border-primary outline-none transition-all font-bold text-slate-800 tracking-tight text-sm placeholder:text-slate-450 shadow-sm"
-                placeholder="Alamat Lengkap Unit..."
+                placeholder="Alamat Lengkap Unit atau Link Google Maps..."
                 value={currentKitchen?.address || ""}
-                onChange={(e) => setCurrentKitchen(prev => ({ ...prev, address: e.target.value }))}
+                onChange={(e) => handleAddressChange(e.target.value)}
                 required
               />
             </div>
+            
+            {currentKitchen?.latitude && currentKitchen?.longitude && (
+              <div className="p-4 bg-emerald-50 text-emerald-800 rounded-[20px] text-xs font-bold flex flex-col gap-1 border border-emerald-100 shadow-sm">
+                <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-600 font-black">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Google Maps Terdeteksi
+                </span>
+                <span>Koordinat: {currentKitchen.latitude}, {currentKitchen.longitude}</span>
+              </div>
+            )}
+            
+            {isResolvingMaps && (
+              <div className="p-4 bg-slate-50 text-slate-600 rounded-[20px] text-xs font-bold flex items-center gap-2.5 border border-slate-100 shadow-sm">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+                Mendeteksi koordinat dari link Google Maps...
+              </div>
+            )}
+            
+            {mapsError && (
+              <div className="p-4 bg-red-50 text-red-700 rounded-[20px] text-xs font-bold border border-red-100 shadow-sm">
+                {mapsError}
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -267,6 +362,45 @@ export const KitchenList = () => {
             </div>
           </div>
 
+          {!currentKitchen?.id && unassignedStaff.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-1">Tugaskan Akun Staf (Belum Memiliki Dapur)</label>
+              <div className="max-h-56 overflow-y-auto p-4 bg-slate-50/50 rounded-[24px] border border-slate-150 space-y-3 shadow-inner">
+                {unassignedStaff.map(staff => {
+                  const displayRole = staff.role === 'Admin' ? 'Admin' : (staff.role === 'Chef' || staff.role === 'Head Chef' ? 'Head Chef' : 'Staff');
+                  return (
+                    <label key={staff.id} className="flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-2xl shadow-sm hover:border-primary/20 transition-all cursor-pointer select-none active:scale-[0.98]">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary"
+                          checked={selectedStaffIds.includes(staff.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedStaffIds(prev => [...prev, staff.id]);
+                            } else {
+                              setSelectedStaffIds(prev => prev.filter(id => id !== staff.id));
+                            }
+                          }}
+                        />
+                        <div className="flex items-center gap-2.5">
+                          <img src={staff.avatar} className="w-8 h-8 rounded-lg object-cover" />
+                          <div>
+                            <p className="text-xs font-black text-slate-800 leading-none">{staff.name}</p>
+                            <p className="text-[9px] font-bold text-slate-400 mt-1.5 uppercase tracking-wider">{staff.email}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[8px] font-black uppercase tracking-wider bg-slate-150 text-slate-600 px-2.5 py-1 rounded-md">
+                        {displayRole}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="pt-6 flex gap-3">
             <Button 
               type="button" 
@@ -284,6 +418,61 @@ export const KitchenList = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Success Credentials Modal */}
+      <Modal 
+        isOpen={isSuccessModalOpen} 
+        onClose={() => setIsSuccessModalOpen(false)} 
+        title="Dapur Baru Berhasil Dibuat!"
+      >
+        <div className="space-y-6 py-2">
+          <div className="p-6 bg-emerald-50 rounded-[28px] border border-emerald-100 flex flex-col gap-2 shadow-sm">
+            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none">DAPUR AKTIF BARU</span>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tighter leading-tight">{newKitchenDetails?.name}</h3>
+            <p className="text-xs text-slate-600 leading-snug">{newKitchenDetails?.address}</p>
+            <p className="text-xs font-bold text-slate-500 mt-1">Kapasitas: {newKitchenDetails?.capacity?.toLocaleString()} Porsi</p>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-1">Kredensial Akun Staf yang Ditugaskan</label>
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+              {newKitchenDetails?.staff && newKitchenDetails.staff.length > 0 ? (
+                newKitchenDetails.staff.map((staff: any) => {
+                  const displayRole = staff.role === 'Admin' ? 'Admin' : (staff.role === 'Chef' || staff.role === 'Head Chef' ? 'Head Chef' : 'Staff');
+                  return (
+                    <div key={staff.id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col gap-2 relative shadow-sm">
+                      <div className="flex items-center justify-between border-b border-slate-150 pb-2">
+                        <div className="flex items-center gap-2">
+                          <img src={staff.avatar} className="w-6 h-6 rounded-md object-cover" />
+                          <span className="text-xs font-black text-slate-800 leading-none">{staff.name}</span>
+                        </div>
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-primary-light text-primary px-2 py-0.5 rounded-full">
+                          {displayRole}
+                        </span>
+                      </div>
+                      <div className="text-[11px] space-y-1">
+                        <p className="text-slate-600"><span className="font-bold text-slate-500">Email:</span> {staff.email}</p>
+                        <p className="text-slate-600"><span className="font-bold text-slate-500">Password:</span> <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-800 font-bold">password</code></p>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-slate-500 px-1">Tidak ada akun staf yang ditugaskan secara langsung.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-4">
+            <Button 
+              className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md"
+              onClick={() => setIsSuccessModalOpen(false)}
+            >
+              Tutup & Selesai
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -17,26 +17,41 @@ async function getKitchens(req, res) {
 
 async function createKitchen(req, res) {
   await delay(100);
-  const { name, address, capacity, city, latitude, longitude } = req.body;
+  const { name, address, capacity, city, latitude, longitude, staffIds, maps_url } = req.body;
   if (!name) {
     return res.status(400).json({ error: 'Kitchen name is required.' });
   }
+
+  let guessedCity = city || 'Unknown';
+  if (!city && address) {
+    guessedCity = address.split(',')[0].trim();
+  }
+
   const id = `k${Date.now()}`;
   const newKitchen = {
     id,
     name,
     address: address || '',
     capacity: Number(capacity) || 0,
-    city: city || 'Unknown',
+    city: guessedCity,
     latitude: latitude !== undefined ? Number(latitude) : null,
-    longitude: longitude !== undefined ? Number(longitude) : null
+    longitude: longitude !== undefined ? Number(longitude) : null,
+    maps_url: maps_url || null
   };
 
   try {
     await db.query(
-      'INSERT INTO kitchens (id, name, address, capacity, city, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [newKitchen.id, newKitchen.name, newKitchen.address, newKitchen.capacity, newKitchen.city, newKitchen.latitude, newKitchen.longitude]
+      'INSERT INTO kitchens (id, name, address, capacity, city, latitude, longitude, maps_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [newKitchen.id, newKitchen.name, newKitchen.address, newKitchen.capacity, newKitchen.city, newKitchen.latitude, newKitchen.longitude, newKitchen.maps_url]
     );
+
+    if (Array.isArray(staffIds) && staffIds.length > 0) {
+      await db.query(
+        'UPDATE staff SET kitchenId = ? WHERE id IN (?)',
+        [newKitchen.id, staffIds]
+      );
+    }
+
     res.status(201).json(newKitchen);
   } catch (error) {
     console.error('Create kitchen error:', error);
@@ -47,7 +62,7 @@ async function createKitchen(req, res) {
 async function updateKitchen(req, res) {
   await delay(100);
   const { id } = req.params;
-  const { name, address, capacity, city, latitude, longitude } = req.body;
+  const { name, address, capacity, city, latitude, longitude, maps_url } = req.body;
 
   try {
     const [rows] = await db.query('SELECT * FROM kitchens WHERE id = ?', [id]);
@@ -60,14 +75,15 @@ async function updateKitchen(req, res) {
       name: name || current.name,
       address: address || current.address,
       capacity: capacity !== undefined ? Number(capacity) : current.capacity,
-      city: city || current.city,
+      city: city || (address ? address.split(',')[0].trim() : current.city),
       latitude: latitude !== undefined ? Number(latitude) : current.latitude,
-      longitude: longitude !== undefined ? Number(longitude) : current.longitude
+      longitude: longitude !== undefined ? Number(longitude) : current.longitude,
+      maps_url: maps_url !== undefined ? maps_url : current.maps_url
     };
 
     await db.query(
-      'UPDATE kitchens SET name = ?, address = ?, capacity = ?, city = ?, latitude = ?, longitude = ? WHERE id = ?',
-      [updated.name, updated.address, updated.capacity, updated.city, updated.latitude, updated.longitude, id]
+      'UPDATE kitchens SET name = ?, address = ?, capacity = ?, city = ?, latitude = ?, longitude = ?, maps_url = ? WHERE id = ?',
+      [updated.name, updated.address, updated.capacity, updated.city, updated.latitude, updated.longitude, updated.maps_url, id]
     );
 
     res.json({ id, ...updated });
@@ -170,10 +186,150 @@ async function getKitchenDetail(req, res) {
   }
 }
 
+async function parseMapsUrl(req, res) {
+  const { url } = req.body;
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required.' });
+  }
+
+  try {
+    let targetUrl = url;
+    // Follow redirect if short URL
+    if (url.includes('maps.app.goo.gl') || url.includes('goo.gl/maps')) {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        redirect: 'follow'
+      });
+      targetUrl = response.url;
+    }
+
+    // Parse coordinates
+    let latitude = null;
+    let longitude = null;
+
+    // Pattern 1: @lat,lng
+    const atMatch = targetUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atMatch) {
+      latitude = parseFloat(atMatch[1]);
+      longitude = parseFloat(atMatch[2]);
+    } else {
+      // Pattern 2: query parameter q=lat,lng or query=lat,lng or ll=lat,lng
+      const queryMatch = targetUrl.match(/[?&](q|query|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (queryMatch) {
+        latitude = parseFloat(queryMatch[2]);
+        longitude = parseFloat(queryMatch[3]);
+      } else {
+        // Pattern 3: !3d-6.1668123!4d106.7865432
+        const dataMatch = targetUrl.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+        if (dataMatch) {
+          latitude = parseFloat(dataMatch[1]);
+          longitude = parseFloat(dataMatch[2]);
+        }
+      }
+    }
+
+    // Parse place name
+    let placeName = null;
+    const placeMatch = targetUrl.match(/\/place\/([^/]+)/);
+    if (placeMatch) {
+      try {
+        placeName = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+      } catch (e) {
+        placeName = placeMatch[1].replace(/\+/g, ' ');
+      }
+    }
+
+    if (latitude === null || longitude === null) {
+      return res.status(400).json({ error: 'Gagal mendeteksi koordinat dari Google Maps link ini.' });
+    }
+
+    res.json({
+      success: true,
+      latitude,
+      longitude,
+      address: placeName || ''
+    });
+  } catch (error) {
+    console.error('Parse maps URL error:', error);
+    res.status(500).json({ error: 'Server error parsing Google Maps URL.' });
+  }
+}
+
+async function addKitchenStaff(req, res) {
+  await delay(100);
+  const { id: kitchenId } = req.params;
+  const { staffId, name, role, email, password } = req.body;
+
+  try {
+    // 1. Check if kitchen exists
+    const [kitchens] = await db.query('SELECT * FROM kitchens WHERE id = ?', [kitchenId]);
+    if (kitchens.length === 0) {
+      return res.status(404).json({ error: 'Kitchen not found.' });
+    }
+
+    // 2. If staffId is provided, we assign the existing staff member to this kitchen
+    if (staffId) {
+      const [staff] = await db.query('SELECT * FROM staff WHERE id = ?', [staffId]);
+      if (staff.length === 0) {
+        return res.status(404).json({ error: 'Staff member not found.' });
+      }
+      if (role) {
+        await db.query('UPDATE staff SET kitchenId = ?, role = ? WHERE id = ?', [kitchenId, role, staffId]);
+      } else {
+        await db.query('UPDATE staff SET kitchenId = ? WHERE id = ?', [kitchenId, staffId]);
+      }
+      return res.json({ success: true, message: 'Staff successfully assigned to kitchen.' });
+    }
+
+    // 3. Otherwise, we create a new staff member manually
+    if (!name || !role || !email) {
+      return res.status(400).json({ error: 'Name, role, and email are required for manual creation.' });
+    }
+
+    // Check if email already exists
+    const [existing] = await db.query('SELECT * FROM staff WHERE LOWER(email) = ?', [email.toLowerCase()]);
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'Email sudah terdaftar.' });
+    }
+
+    const bcrypt = require('bcryptjs');
+    const newId = `s_manual_${Date.now()}`;
+    const defaultPassword = password || 'password';
+    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+    const newStaff = {
+      id: newId,
+      name,
+      role,
+      status: 'Active',
+      avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(newId)}`,
+      kitchenId,
+      email: email.toLowerCase(),
+      password: hashedPassword
+    };
+
+    await db.query(
+      'INSERT INTO staff (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [newStaff.id, newStaff.name, newStaff.role, newStaff.status, newStaff.avatar, newStaff.kitchenId, newStaff.email, newStaff.password]
+    );
+
+    const { password: _, ...responseStaff } = newStaff;
+    res.status(201).json(responseStaff);
+  } catch (error) {
+    console.error('Add kitchen staff error:', error);
+    res.status(500).json({ error: 'Server error assigning or creating kitchen staff.' });
+  }
+}
+
 module.exports = {
   getKitchens,
   createKitchen,
   updateKitchen,
   deleteKitchen,
-  getKitchenDetail
+  getKitchenDetail,
+  parseMapsUrl,
+  addKitchenStaff
 };

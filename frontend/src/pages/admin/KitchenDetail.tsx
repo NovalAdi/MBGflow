@@ -29,6 +29,39 @@ export const KitchenDetail = () => {
   const [currentKitchen, setCurrentKitchen] = React.useState<any>(null);
   const [menus, setMenus] = React.useState<any[]>([]);
 
+  // New states for staff modal & unassigned staff
+  const [isManualMode, setIsManualMode] = React.useState(false);
+  const [unassignedStaff, setUnassignedStaff] = React.useState<any[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = React.useState("");
+  const [newStaffEmail, setNewStaffEmail] = React.useState("");
+  const [newStaffPassword, setNewStaffPassword] = React.useState("password");
+  const [staffError, setStaffError] = React.useState<string | null>(null);
+  const [editingStaff, setEditingStaff] = React.useState<any | null>(null);
+
+  // States for deleting station confirmation modal
+  const [isDeleteStationModalOpen, setIsDeleteStationModalOpen] = React.useState(false);
+  const [stationToDeleteId, setStationToDeleteId] = React.useState<string | null>(null);
+
+  // States for Google Maps URL resolution in edit kitchen modal
+  const [isResolvingMaps, setIsResolvingMaps] = React.useState(false);
+  const [mapsError, setMapsError] = React.useState<string | null>(null);
+
+  const fetchUnassignedStaff = React.useCallback(async () => {
+    try {
+      const staffList = await api.getStaff();
+      const unassigned = staffList.filter((s: any) => !s.kitchenId);
+      setUnassignedStaff(unassigned);
+      if (unassigned.length > 0) {
+        setSelectedStaffId(unassigned[0].id);
+      } else {
+        setSelectedStaffId("");
+        setIsManualMode(true);
+      }
+    } catch (error) {
+      console.error("Failed to fetch staff", error);
+    }
+  }, []);
+
   // States for Work Station / Division of Labor
   const [stations, setStations] = React.useState<any[]>([]);
   const [isStationModalOpen, setStationModalOpen] = React.useState(false);
@@ -106,12 +139,41 @@ export const KitchenDetail = () => {
     setStationModalOpen(false);
   };
 
-  const handleDeleteStation = (stationId: string) => {
-    if (!detail) return;
-    if (!confirm("Apakah Anda yakin ingin menghapus pembagian stasiun kerja ini?")) return;
-    const updatedStations = stations.filter(s => s.id !== stationId);
+  const handleOpenDeleteStationModal = (stationId: string) => {
+    setStationToDeleteId(stationId);
+    setIsDeleteStationModalOpen(true);
+  };
+
+  const handleConfirmDeleteStation = () => {
+    if (!detail || !stationToDeleteId) return;
+    const updatedStations = stations.filter(s => s.id !== stationToDeleteId);
     setStations(updatedStations);
     localStorage.setItem(`stations_${detail.id}`, JSON.stringify(updatedStations));
+    setIsDeleteStationModalOpen(false);
+    setStationToDeleteId(null);
+  };
+
+  const handleEditStaffClick = (staff: any) => {
+    setEditingStaff(staff);
+    setNewStaffName(staff.name);
+    setNewStaffEmail(staff.email || "");
+    setNewStaffRole(staff.role);
+    setNewStaffPassword(""); 
+    setStaffError(null);
+    setIsManualMode(true);
+    setStaffModalOpen(true);
+  };
+
+  const handleDeleteStaff = async (staffId: string) => {
+    if (!confirm("Apakah Anda yakin ingin mengeluarkan staf ini dari dapur?")) return;
+    try {
+      await api.deleteStaff(staffId);
+      const updatedData = await api.getKitchenDetail(selectedKitchenId);
+      setDetail(updatedData);
+    } catch (err: any) {
+      console.error("Failed to delete staff member", err);
+      alert(err.message || "Gagal menghapus staf.");
+    }
   };
 
   const handleUpdateKitchen = async (e: React.FormEvent) => {
@@ -126,25 +188,90 @@ export const KitchenDetail = () => {
     }
   };
 
-  const handleAddStaff = (e: React.FormEvent) => {
+  const handleAddressChange = async (val: string) => {
+    setCurrentKitchen((prev: any) => ({ ...prev, address: val }));
+    setMapsError(null);
+
+    const isMapsLink = val.includes("maps.app.goo.gl") || 
+                       val.includes("goo.gl/maps") || 
+                       val.includes("google.com/maps");
+
+    if (isMapsLink) {
+      setIsResolvingMaps(true);
+      try {
+        const result = await api.parseMapsUrl(val);
+        if (result.success) {
+          setCurrentKitchen((prev: any) => ({
+            ...prev,
+            address: result.address || val,
+            latitude: result.latitude,
+            longitude: result.longitude,
+            maps_url: val
+          }));
+        }
+      } catch (err: any) {
+        console.error("Maps parsing failed", err);
+        setMapsError(err.message || "Gagal mendeteksi koordinat Google Maps.");
+      } finally {
+        setIsResolvingMaps(false);
+      }
+    }
+  };
+
+  const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStaffName) return;
+    setStaffError(null);
 
-    const newStaff = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newStaffName,
-      role: newStaffRole,
-      status: 'Active',
-      avatar: `https://i.pravatar.cc/150?u=${newStaffName}`
-    };
+    try {
+      if (editingStaff) {
+        if (!newStaffName || !newStaffEmail) {
+          setStaffError("Nama lengkap dan email wajib diisi.");
+          return;
+        }
+        await api.updateStaff(editingStaff.id, {
+          name: newStaffName,
+          email: newStaffEmail,
+          role: newStaffRole,
+          password: newStaffPassword || undefined
+        });
+      } else {
+        if (isManualMode) {
+          if (!newStaffName || !newStaffEmail) {
+            setStaffError("Nama lengkap dan email wajib diisi.");
+            return;
+          }
+          await api.addKitchenStaff(selectedKitchenId, {
+            name: newStaffName,
+            email: newStaffEmail,
+            role: newStaffRole,
+            password: newStaffPassword
+          });
+        } else {
+          if (!selectedStaffId) {
+            setStaffError("Silakan pilih staf dari dropdown.");
+            return;
+          }
+          await api.addKitchenStaff(selectedKitchenId, {
+            staffId: selectedStaffId,
+            role: newStaffRole
+          });
+        }
+      }
 
-    setDetail((prev: any) => ({
-      ...prev,
-      staff: [...(prev.staff || []), newStaff]
-    }));
-
-    setStaffModalOpen(false);
-    setNewStaffName("");
+      // Refresh kitchen detail from API
+      const updatedData = await api.getKitchenDetail(selectedKitchenId);
+      setDetail(updatedData);
+      
+      setStaffModalOpen(false);
+      setNewStaffName("");
+      setNewStaffEmail("");
+      setNewStaffPassword("password");
+      setSelectedStaffId("");
+      setEditingStaff(null);
+    } catch (err: any) {
+      console.error("Failed to add or update kitchen staff", err);
+      setStaffError(err.message || "Gagal menyimpan detail staf.");
+    }
   };
 
   React.useEffect(() => {
@@ -161,7 +288,7 @@ export const KitchenDetail = () => {
       const cached = localStorage.getItem(`stations_${selectedKitchenId}`);
       if (cached) {
         setStations(JSON.parse(cached));
-      } else {
+      } else if (['k1', 'k2', 'k3'].includes(selectedKitchenId)) {
         const cleanStaff = data.staff?.filter((s: any) => s.role !== 'Admin') || [];
         const headChefs = cleanStaff.filter((s: any) => s.role === 'Chef' || s.role === 'Head Chef');
         const staffMembers = cleanStaff.filter((s: any) => s.role !== 'Chef' && s.role !== 'Head Chef');
@@ -206,6 +333,8 @@ export const KitchenDetail = () => {
         ];
         setStations(defaultStations);
         localStorage.setItem(`stations_${selectedKitchenId}`, JSON.stringify(defaultStations));
+      } else {
+        setStations([]);
       }
     });
   }, [selectedKitchenId]);
@@ -233,11 +362,11 @@ export const KitchenDetail = () => {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest text-slate-600 bg-slate-50 px-3 py-2 rounded-xl">
                    <MapPin className="w-3.5 h-3.5 text-primary" />
-                   {detail.address}, Central Jakarta
+                   {detail.address}
                 </div>
                 <button 
-                  onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(detail.address)}`, '_blank')}
-                  className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-primary hover:text-primary-dark transition-all"
+                  onClick={() => window.open(detail.maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(detail.address)}`, '_blank')}
+                  className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-primary hover:text-primary-dark transition-all bg-transparent border-none p-0 cursor-pointer"
                 >
                   <ExternalLink className="w-3 h-3" />
                   Buka di Maps
@@ -336,7 +465,15 @@ export const KitchenDetail = () => {
                   <h3 className="text-3xl font-black text-slate-800 tracking-tighter leading-tight">Database Personel</h3>
                   <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-1 px-0.5">{detail.staff?.length || 0} Staf Terdaftar</p>
                 </div>
-                <Button onClick={() => setStaffModalOpen(true)} className="rounded-[18px] py-4 px-6 font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-primary/20">
+                <Button 
+                  onClick={() => {
+                    setStaffError(null);
+                    setIsManualMode(false);
+                    fetchUnassignedStaff();
+                    setStaffModalOpen(true);
+                  }} 
+                  className="rounded-[18px] py-4 px-6 font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-primary/20"
+                >
                   <Plus className="w-5 h-5 mr-3" />
                   Staf Baru
                 </Button>
@@ -353,38 +490,61 @@ export const KitchenDetail = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {detail.staff?.filter((s: any) => ['Admin', 'Chef', 'Head Chef', 'Staff'].includes(s.role)).map((s: any) => {
-                      const displayRole = s.role === 'Admin' ? 'Admin' : (s.role === 'Chef' || s.role === 'Head Chef' ? 'Head Chef' : 'Staff');
-                      return (
-                        <tr key={s.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                          <td className="py-8 px-10">
-                            <div className="w-14 h-14 rounded-2xl border-[3px] border-white shadow-xl overflow-hidden bg-slate-100 ring-1 ring-slate-100 group-hover:scale-110 transition-transform">
-                              <img src={s.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                            </div>
-                          </td>
-                          <td className="py-8 px-6">
-                             <span className="font-black text-slate-700 tracking-tighter text-lg leading-tight group-hover:text-primary transition-colors">{s.name}</span>
-                          </td>
-                          <td className="py-8 px-6">
-                            <Badge status={displayRole} className="rounded-full px-4 py-1.5 bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest border-none" />
-                          </td>
-                          <td className="py-8 px-6">
-                            <div className="flex items-center gap-3 font-black text-[10px] uppercase tracking-widest text-primary bg-primary-light w-fit px-4 py-2 rounded-full">
-                              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                              {s.status === 'Active' ? 'Online' : s.status}
-                            </div>
-                          </td>
-                          <td className="py-8 px-10 text-right space-x-3">
-                            <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full hover:bg-white hover:shadow-md text-slate-500 hover:text-primary transition-all">
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full hover:bg-red-50 text-slate-500 hover:text-red-500 transition-all">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {(() => {
+                      const filteredStaff = detail.staff?.filter((s: any) => ['Admin', 'Chef', 'Head Chef', 'Staff'].includes(s.role)) || [];
+                      if (filteredStaff.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={5} className="py-20 text-center">
+                              <p className="text-slate-800 font-black text-lg tracking-tight">Belum ada staf terdaftar</p>
+                              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Klik tombol "Staf Baru" untuk mulai menugaskan staf</p>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return filteredStaff.map((s: any) => {
+                        const displayRole = s.role === 'Admin' ? 'Admin' : (s.role === 'Chef' || s.role === 'Head Chef' ? 'Head Chef' : 'Staff');
+                        return (
+                          <tr key={s.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
+                            <td className="py-8 px-10">
+                              <div className="w-14 h-14 rounded-2xl border-[3px] border-white shadow-xl overflow-hidden bg-slate-100 ring-1 ring-slate-100 group-hover:scale-110 transition-transform">
+                                <img src={s.avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              </div>
+                            </td>
+                            <td className="py-8 px-6">
+                               <span className="font-black text-slate-700 tracking-tighter text-lg leading-tight group-hover:text-primary transition-colors">{s.name}</span>
+                            </td>
+                            <td className="py-8 px-6">
+                              <Badge status={displayRole} className="rounded-full px-4 py-1.5 bg-slate-100 text-slate-500 font-black text-[10px] uppercase tracking-widest border-none" />
+                            </td>
+                            <td className="py-8 px-6">
+                              <div className="flex items-center gap-3 font-black text-[10px] uppercase tracking-widest text-primary bg-primary-light w-fit px-4 py-2 rounded-full">
+                                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                {s.status === 'Active' ? 'Online' : s.status}
+                              </div>
+                            </td>
+                            <td className="py-8 px-10 text-right space-x-3">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="w-10 h-10 rounded-full hover:bg-white hover:shadow-md text-slate-500 hover:text-primary transition-all"
+                                onClick={() => handleEditStaffClick(s)}
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="w-10 h-10 rounded-full hover:bg-red-50 text-slate-500 hover:text-red-500 transition-all"
+                                onClick={() => handleDeleteStaff(s.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -452,7 +612,7 @@ export const KitchenDetail = () => {
                                 variant="ghost" 
                                 size="icon" 
                                 className="w-8 h-8 rounded-full hover:bg-red-50 text-slate-500 hover:text-red-500 transition-all p-0 border-none"
-                                onClick={() => handleDeleteStation(sta.id)}
+                                onClick={() => handleOpenDeleteStationModal(sta.id)}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
@@ -507,9 +667,21 @@ export const KitchenDetail = () => {
                 <h3 className="text-lg font-bold text-slate-700">Monitor Stok Dapur</h3>
               </div>
               <div className="grid grid-cols-1 gap-4">
-                {detail.stock?.map((item: InventoryItem) => (
-                  <StockRow key={item.id} item={item} />
-                ))}
+                {detail.stock && detail.stock.length > 0 ? (
+                  detail.stock.map((item: InventoryItem) => (
+                    <StockRow key={item.id} item={item} />
+                  ))
+                ) : (
+                  <div className="py-20 text-center bg-slate-50/30 rounded-[40px] border border-slate-100 flex flex-col items-center justify-center gap-4 w-full">
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                      <Warehouse className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <p className="text-slate-800 font-black text-lg tracking-tight">Stok Dapur Kosong</p>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">Belum ada bahan baku terdaftar di dapur ini</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -517,32 +689,138 @@ export const KitchenDetail = () => {
       </div>
 
       {/* Staff Modal */}
-      <Modal isOpen={isStaffModalOpen} onClose={() => setStaffModalOpen(false)} title="Tambah Staff Baru">
+      <Modal isOpen={isStaffModalOpen} onClose={() => { setStaffModalOpen(false); setEditingStaff(null); }} title={editingStaff ? "Edit Detail Staf" : "Tambah Staff Baru"}>
         <form className="space-y-6 py-2" onSubmit={handleAddStaff}>
-          <div className="space-y-2">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Nama Lengkap Staff</label>
-            <input 
-              type="text" 
-              className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all" 
-              placeholder="Masukkan nama lengkap..." 
-              value={newStaffName}
-              onChange={(e) => setNewStaffName(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Peran / Jabatan</label>
-            <select 
-              className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all cursor-pointer"
-              value={newStaffRole}
-              onChange={(e) => setNewStaffRole(e.target.value)}
-            >
-              <option>Head Chef</option>
-              <option>Staff</option>
-            </select>
-          </div>
+          {staffError && (
+            <div className="p-4 bg-red-50 text-red-700 rounded-[20px] text-xs font-bold border border-red-100 shadow-sm">
+              {staffError}
+            </div>
+          )}
+
+          {!editingStaff && (
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+              <button
+                type="button"
+                className={cn(
+                  "flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all",
+                  !isManualMode ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                )}
+                onClick={() => setIsManualMode(false)}
+              >
+                Pilih dari Database
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all",
+                  isManualMode ? "bg-white text-slate-800 shadow" : "text-slate-500 hover:text-slate-700"
+                )}
+                onClick={() => setIsManualMode(true)}
+              >
+                Input Manual / Baru
+              </button>
+            </div>
+          )}
+
+          {!isManualMode ? (
+            <>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Pilih Staf Tanpa Dapur</label>
+                <select 
+                  className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all cursor-pointer shadow-sm"
+                  value={selectedStaffId}
+                  onChange={(e) => setSelectedStaffId(e.target.value)}
+                  required
+                >
+                  {unassignedStaff.length > 0 ? (
+                    unassignedStaff.map(s => {
+                      const displayRole = s.role === 'Admin' ? 'Admin' : (s.role === 'Chef' || s.role === 'Head Chef' ? 'Head Chef' : 'Staff');
+                      return (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({displayRole} - {s.email})
+                        </option>
+                      );
+                    })
+                  ) : (
+                    <option value="">Tidak ada staf tak berdapur tersedia</option>
+                  )}
+                </select>
+                {unassignedStaff.length === 0 && (
+                  <p className="text-[10px] text-amber-600 font-bold px-1 mt-1">
+                    Semua staf terdaftar sudah ditugaskan ke dapur. Gunakan opsi "Input Manual / Baru".
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2 mt-4">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Peran / Jabatan Baru</label>
+                <select 
+                  className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all cursor-pointer shadow-sm"
+                  value={newStaffRole}
+                  onChange={(e) => setNewStaffRole(e.target.value)}
+                >
+                  <option value="Head Chef">Head Chef (Chef)</option>
+                  <option value="Staff">Staff Masak</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Nama Lengkap Staff</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all shadow-sm" 
+                  placeholder="Masukkan nama lengkap..." 
+                  value={newStaffName}
+                  onChange={(e) => setNewStaffName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Email</label>
+                <input 
+                  type="email" 
+                  className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all shadow-sm" 
+                  placeholder="Contoh: staff.baru@mbg.com" 
+                  value={newStaffEmail}
+                  onChange={(e) => setNewStaffEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Password</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all shadow-sm" 
+                  placeholder={editingStaff ? "Kosongkan jika tidak ingin mengubah password..." : "Kata sandi (default: password)"} 
+                  value={newStaffPassword}
+                  onChange={(e) => setNewStaffPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 block">Peran / Jabatan</label>
+                <select 
+                  className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all cursor-pointer shadow-sm"
+                  value={newStaffRole}
+                  onChange={(e) => setNewStaffRole(e.target.value)}
+                >
+                  <option value="Head Chef">Head Chef (Chef)</option>
+                  <option value="Staff">Staff Masak</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </div>
+            </>
+          )}
+
           <div className="pt-2">
-            <Button type="submit" className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs">Simpan Detail Staff</Button>
+            <Button 
+              type="submit" 
+              className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md"
+              disabled={!isManualMode && unassignedStaff.length === 0}
+            >
+              Simpan Detail Staff
+            </Button>
           </div>
         </form>
       </Modal>
@@ -571,16 +849,39 @@ export const KitchenDetail = () => {
 
           <div className="space-y-3">
             <div className="relative group/input">
-              <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within/input:text-primary transition-colors" />
+              <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-350 group-focus-within/input:text-primary transition-colors" />
               <input 
                 type="text" 
                 className="w-full bg-slate-50 border-2 border-transparent rounded-[20px] pl-14 pr-6 py-4 focus:bg-white focus:border-primary outline-none transition-all font-bold text-slate-800 tracking-tight text-sm placeholder:text-slate-300 shadow-sm"
-                placeholder="Alamat Lengkap Unit..."
+                placeholder="Alamat Lengkap Unit atau Link Google Maps..."
                 value={currentKitchen?.address || ""}
-                onChange={(e) => setCurrentKitchen((prev: any) => ({ ...prev, address: e.target.value }))}
+                onChange={(e) => handleAddressChange(e.target.value)}
                 required
               />
             </div>
+
+            {currentKitchen?.latitude && currentKitchen?.longitude && (
+              <div className="p-4 bg-emerald-50 text-emerald-800 rounded-[20px] text-xs font-bold flex flex-col gap-1 border border-emerald-100 shadow-sm mt-3">
+                <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-emerald-600 font-black">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Google Maps Terdeteksi
+                </span>
+                <span>Koordinat: {currentKitchen.latitude}, {currentKitchen.longitude}</span>
+              </div>
+            )}
+
+            {isResolvingMaps && (
+              <div className="p-4 bg-slate-50 text-slate-600 rounded-[20px] text-xs font-bold flex items-center gap-2.5 border border-slate-100 shadow-sm mt-3">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+                Mendeteksi koordinat dari link Google Maps...
+              </div>
+            )}
+
+            {mapsError && (
+              <div className="p-4 bg-red-50 text-red-700 rounded-[20px] text-xs font-bold border border-red-100 shadow-sm mt-3">
+                {mapsError}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -805,6 +1106,43 @@ export const KitchenDetail = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Station Confirmation Modal */}
+      <Modal 
+        isOpen={isDeleteStationModalOpen} 
+        onClose={() => {
+          setIsDeleteStationModalOpen(false);
+          setStationToDeleteId(null);
+        }} 
+        title="Konfirmasi Hapus"
+      >
+        <div className="space-y-6 py-2">
+          <div className="p-4 bg-red-50 text-red-700 rounded-[20px] text-xs font-bold border border-red-100 shadow-sm">
+            Apakah Anda yakin ingin menghapus stasiun kerja ini? Tindakan ini tidak dapat dibatalkan.
+          </div>
+          <div className="pt-2 flex gap-3">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs text-slate-400 hover:bg-slate-50 border-none"
+              onClick={() => {
+                setIsDeleteStationModalOpen(false);
+                setStationToDeleteId(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button 
+              type="button"
+              variant="danger"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs"
+              onClick={handleConfirmDeleteStation}
+            >
+              Hapus
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
