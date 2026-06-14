@@ -56,7 +56,6 @@ export const AdminDashboard = () => {
     { label: "Total Dapur Aktif", value: stats.activeKitchens.toString(), icon: UtensilsCrossed, sub: "5 Dapur baru", color: "bg-primary text-white", active: true },
     { label: "Porsi Sukses Hari Ini", value: stats.successfulServings.toLocaleString(), icon: TrendingUp, sub: "12% Lebih tinggi", color: "bg-white text-slate-900 border border-slate-100" },
     { label: "Aktivitas Memasak", value: `${stats.currentlyCooking}/${stats.totalDailyActivities}`, icon: Utensils, sub: "2 Sedang berjalan", color: "bg-white text-slate-900 border border-slate-100" },
-    { label: "Karyawan Bertugas", value: stats.chefsOnDuty.toString(), icon: Users, sub: "Shift Pagi", color: "bg-white text-slate-900 border border-slate-100" },
   ];
 
   return (
@@ -66,7 +65,7 @@ export const AdminDashboard = () => {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {statCards.map((stat, i) => (
           <Card 
             key={i} 

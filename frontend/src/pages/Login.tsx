@@ -5,6 +5,7 @@ import { Button } from "../components/ui/Button";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { api } from "../services/api";
+import mbgImage from "../assets/mbg.jpeg";
 
 export const Login = ({ onLogin }: { onLogin: (user: any) => void }) => {
   const [email, setEmail] = React.useState("");
@@ -49,11 +50,11 @@ export const Login = ({ onLogin }: { onLogin: (user: any) => void }) => {
           className="absolute inset-0"
         >
           <img 
-            src="https://images.unsplash.com/photo-1556910103-1c02745aae4d?q=80&w=2070&auto=format&fit=crop" 
+            src={mbgImage} 
             className="w-full h-full object-cover opacity-80"
             alt="Kitchen Background"
           />
-          <div className="absolute inset-0 bg-slate-900/20" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-primary-dark/75 via-primary/65 to-slate-900/50 mix-blend-multiply" />
         </motion.div>
 
         <div className="relative z-10 p-16 flex flex-col justify-between h-full w-full">
@@ -86,9 +87,7 @@ export const Login = ({ onLogin }: { onLogin: (user: any) => void }) => {
           </div>
 
           <div className="flex items-center gap-6 text-white/50 text-xs font-bold uppercase tracking-widest">
-            <span>© 2024 MBG Culinaries</span>
-            <div className="w-1 h-1 rounded-full bg-white/20" />
-            <span>Version 2.4.0</span>
+            <span>© Maneki Strategy</span>
           </div>
         </div>
       </div>

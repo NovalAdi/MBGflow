@@ -115,12 +115,12 @@ export const ProductionHistory = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <Button variant="secondary" className="rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2">
             <Download className="w-4 h-4" />
             Export CSV
           </Button>
-        </div>
+        </div> */}
       </div>
 
       {/* Summary Cards */}

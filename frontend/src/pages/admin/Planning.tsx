@@ -360,6 +360,7 @@ export const ProductionPlanning = () => {
   const [inventory, setInventory] = React.useState<any[]>([]);
   const [menus, setMenus] = React.useState<Menu[]>(FALLBACK_MENUS as Menu[]);
   const [activeId, setActiveId] = React.useState<string | null>(null);
+  const [filterKitchenId, setFilterKitchenId] = React.useState<string>("all");
 
   // Chronological Stock Simulation
   const { planResults, cumulativeShortagesPerKitchen } = useProductionSimulation(plans, inventory, menus, kitchens);
@@ -605,7 +606,7 @@ export const ProductionPlanning = () => {
   // Calculation Logic for Form
   const selectedMenuData = menus.find(m => m.name === formData.menu);
   const calculatedMaterials = React.useMemo(() => {
-    if (!selectedMenuData) return [];
+    if (!selectedMenuData || !formData.portions || formData.portions <= 0) return [];
     return selectedMenuData.ingredients.map(ing => {
       const needed = Number((ing.perPortion * formData.portions).toFixed(2));
       const item = inventory.find(i => i.name === ing.name);
@@ -674,6 +675,19 @@ export const ProductionPlanning = () => {
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Kalender Produksi</h2>
           <p className="text-slate-400 font-bold text-[11px] uppercase tracking-widest mt-2">Jadwal Operasional Dapur</p>
         </div>
+        <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-[20px] px-5 py-2.5 shadow-sm">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter Dapur:</span>
+          <select 
+            value={filterKitchenId} 
+            onChange={(e) => setFilterKitchenId(e.target.value)}
+            className="bg-transparent border-none outline-none text-xs font-bold text-slate-700 cursor-pointer"
+          >
+            <option value="all">Tampilkan Semua Dapur</option>
+            {kitchens.map(k => (
+              <option key={k.id} value={k.id}>{k.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <DndContext
@@ -688,7 +702,7 @@ export const ProductionPlanning = () => {
             <DayColumn 
               key={day}
               day={day}
-              items={plans.find(p => p.day === day)?.items || []}
+              items={(plans.find(p => p.day === day)?.items || []).filter((item: any) => filterKitchenId === "all" || item.kitchenId === filterKitchenId)}
               onAddClick={handleAddClick}
               onItemClick={handleItemClick}
               isItemLow={isItemLow}
@@ -751,13 +765,30 @@ export const ProductionPlanning = () => {
                 <select 
                   className="w-full bg-white border-2 border-slate-100 focus:border-primary rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none transition-all cursor-pointer"
                   value={formData.kitchenId}
-                  onChange={(e) => setFormData(prev => ({ ...prev, kitchenId: e.target.value }))}
+                  onChange={(e) => {
+                    const newKitchenId = e.target.value;
+                    const targetKitchen = kitchens.find(k => k.id === newKitchenId);
+                    const cap = targetKitchen?.capacity || 0;
+                    const dayPlans = plans.find(p => p.day === selectedDay)?.items || [];
+                    const otherPortions = dayPlans
+                      .filter((plan: any) => {
+                        const planKitchenId = plan.kitchenId || kitchens.find(k => k.name === plan.k || k.name.includes(plan.k) || plan.k?.includes(k.name))?.id;
+                        return planKitchenId === newKitchenId && plan.id !== formData.id;
+                      })
+                      .reduce((sum: number, plan: any) => sum + (Number(plan.portions) || 0), 0);
+                    const maxAllowed = Math.max(0, cap - otherPortions);
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      kitchenId: newKitchenId,
+                      portions: Math.min(prev.portions, maxAllowed)
+                    }));
+                  }}
                 >
                   {kitchens.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
                 </select>
                 {formData.kitchenId && (
                   <p className="text-[10px] font-bold text-slate-400 mt-1 px-1">
-                    Kapasitas Dapur: <span className="text-slate-655">{selectedKitchenCapacity} porsi</span> | Sudah Terencana: <span className="text-slate-655">{otherPlansPortionsForDay} porsi</span>
+                    Kapasitas Dapur: <span className="text-slate-655">{selectedKitchenCapacity} porsi</span> | Sudah Terencana: <span className="text-slate-655">{otherPlansPortionsForDay} porsi</span> | Sisa Kapasitas: <span className="text-primary font-black">{Math.max(0, selectedKitchenCapacity - otherPlansPortionsForDay)} porsi</span>
                   </p>
                 )}
               </div>
@@ -767,7 +798,13 @@ export const ProductionPlanning = () => {
                   <input 
                     type="number" 
                     value={formData.portions || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, portions: Number(e.target.value) }))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      const maxAllowed = Math.max(0, selectedKitchenCapacity - otherPlansPortionsForDay);
+                      setFormData(prev => ({ ...prev, portions: Math.min(val, maxAllowed) }));
+                    }}
+                    max={Math.max(0, selectedKitchenCapacity - otherPlansPortionsForDay)}
+                    min="0"
                     placeholder="Masukkan jumlah porsi..."
                     className="w-full bg-white border-2 border-slate-100 focus:border-primary rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none transition-all pr-16"
                   />
