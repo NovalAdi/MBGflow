@@ -258,19 +258,19 @@ export const RequestStock = () => {
                         onClick={() => handleBulkApprove(kitchenName, pending)}
                         className="bg-primary hover:bg-primary-dark text-white text-[9px] font-black uppercase tracking-widest px-3.5 py-2 rounded-xl shadow-sm cursor-pointer"
                       >
-                        Approve All
+                        Setujui Semua
                       </Button>
                       <Button
                         onClick={() => handleOpenBulkModal(kitchenName, pending, "Pending")}
                         className="bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-black uppercase tracking-widest px-3.5 py-2 rounded-xl shadow-sm cursor-pointer"
                       >
-                        Hold All
+                        Tunda Semua
                       </Button>
                       <Button
                         onClick={() => handleOpenBulkModal(kitchenName, pending, "Denied")}
-                        className="bg-red-500 hover:bg-red-650 text-white text-[9px] font-black uppercase tracking-widest px-3.5 py-2 rounded-xl shadow-sm cursor-pointer"
+                        className="bg-red-500 hover:bg-red-655 text-white text-[9px] font-black uppercase tracking-widest px-3.5 py-2 rounded-xl shadow-sm cursor-pointer"
                       >
-                        Deny All
+                        Tolak Semua
                       </Button>
                     </div>
                   )}
@@ -324,12 +324,12 @@ export const RequestStock = () => {
                             <td className="p-4">
                               <span className={cn("px-2.5 py-1 rounded-full font-black text-[9px] uppercase tracking-wider border", statusColor)}>
                                 {req.status === "Pending" 
-                                  ? "Menunggu" 
+                                  ? "Menunggu (Pending)" 
                                   : req.status === "Approved" 
-                                  ? "Disetujui" 
+                                  ? "Disetujui (Approved)" 
                                   : req.status === "Denied" || req.status === "Rejected"
-                                  ? "Ditolak"
-                                  : "Selesai"}
+                                  ? "Ditolak (Rejected)"
+                                  : "Selesai (Delivered)"}
                               </span>
                             </td>
                           </tr>
@@ -444,12 +444,12 @@ export const RequestStock = () => {
                       : "bg-red-50 text-red-650 border-red-100/60"
                   )}>
                     {selectedRequest.status === "Pending" 
-                      ? "Menunggu" 
+                      ? "Menunggu (Pending)" 
                       : selectedRequest.status === "Approved" 
-                      ? "Disetujui" 
+                      ? "Disetujui (Approved)" 
                       : selectedRequest.status === "Denied" || selectedRequest.status === "Rejected"
-                      ? "Ditolak"
-                      : "Selesai"}
+                      ? "Ditolak (Rejected)"
+                      : "Selesai (Delivered)"}
                   </span>
                 </div>
               </div>

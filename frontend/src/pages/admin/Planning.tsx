@@ -461,6 +461,7 @@ export const ProductionPlanning = () => {
   const [isFormModalOpen, setFormModalOpen] = React.useState(false);
   const [selectedDay, setSelectedDay] = React.useState("");
   const [isEditMode, setIsEditMode] = React.useState(false);
+  const [portionsError, setPortionsError] = React.useState("");
 
   // Form State
   const [formData, setFormData] = React.useState({
@@ -507,6 +508,7 @@ export const ProductionPlanning = () => {
 
   const handleSavePlan = async () => {
     if (!formData.portions || formData.portions <= 0) {
+      setPortionsError("Porsi wajib diisi");
       alert("Harap masukkan jumlah porsi yang valid.");
       return;
     }
@@ -575,6 +577,7 @@ export const ProductionPlanning = () => {
       portions: item.portions,
       note: item.note || ""
     });
+    setPortionsError("");
     setFormModalOpen(true);
   };
 
@@ -592,6 +595,7 @@ export const ProductionPlanning = () => {
       portions: 0,
       note: ""
     });
+    setPortionsError("");
     setFormModalOpen(true);
   };
 
@@ -800,6 +804,7 @@ export const ProductionPlanning = () => {
                     value={formData.portions || ""}
                     onChange={(e) => {
                       const val = Number(e.target.value);
+                      if (val > 0) setPortionsError("");
                       const maxAllowed = Math.max(0, selectedKitchenCapacity - otherPlansPortionsForDay);
                       setFormData(prev => ({ ...prev, portions: Math.min(val, maxAllowed) }));
                     }}
@@ -810,6 +815,11 @@ export const ProductionPlanning = () => {
                   />
                   <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs uppercase tracking-wider">Porsi</div>
                 </div>
+                {portionsError && (
+                  <p id="portionsError" className="text-xs font-black text-red-500 mt-1 px-1">
+                    {portionsError}
+                  </p>
+                )}
                 {isFormOverCapacity && (
                   <div className="p-4 bg-amber-500 rounded-2xl flex gap-4 items-start shadow-xl shadow-amber-500/20 text-white animate-pulse mt-3">
                     <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />

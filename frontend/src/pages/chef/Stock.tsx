@@ -15,8 +15,10 @@ export const ChefStock = ({ user }: { user: any }) => {
   const [isWastageModalOpen, setWastageModalOpen] = React.useState(false);
   const [selectedBatch, setSelectedBatch] = React.useState<any>(null);
   const [wastageWeight, setWastageWeight] = React.useState("");
+  const [errorMsg, setErrorMsg] = React.useState("");
   const [wastageReason, setWastageReason] = React.useState("Busuk");
   const [wastageNotes, setWastageNotes] = React.useState("");
+  const [successMsg, setSuccessMsg] = React.useState("");
 
   const refreshStock = React.useCallback(() => {
     if (user?.kitchenId) {
@@ -46,6 +48,7 @@ export const ChefStock = ({ user }: { user: any }) => {
     setWastageWeight("");
     setWastageReason("Busuk");
     setWastageNotes("");
+    setErrorMsg("");
     setWastageModalOpen(true);
   };
 
@@ -54,6 +57,7 @@ export const ChefStock = ({ user }: { user: any }) => {
     if (!selectedBatch || !user?.kitchenId) return;
 
     try {
+      setErrorMsg("");
       await api.reportWastage({
         batchId: selectedBatch.id,
         kitchenId: user.kitchenId,
@@ -64,14 +68,23 @@ export const ChefStock = ({ user }: { user: any }) => {
         notes: wastageNotes
       });
       setWastageModalOpen(false);
+      setSuccessMsg("Laporan wastage berhasil dikirim! (Sukses)");
+      setTimeout(() => {
+        setSuccessMsg("");
+      }, 3000);
       refreshStock();
     } catch (err: any) {
-      alert(err?.message || "Gagal melaporkan wastage.");
+      setErrorMsg(err?.message || "Gagal melaporkan wastage.");
     }
   };
 
   return (
     <div className="max-w-6xl mx-auto space-y-4">
+      {successMsg && (
+        <div id="toastSuccess" className="fixed top-6 right-6 z-50 bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 border border-emerald-500 font-bold text-sm toast">
+          <span>{successMsg}</span>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Stok Dapur Granular</h2>
@@ -115,6 +128,11 @@ export const ChefStock = ({ user }: { user: any }) => {
           </div>
 
           <form className="space-y-4" onSubmit={handleWastageSubmit}>
+            {errorMsg && (
+              <div id="alert_ExceedsStockError" className="p-4 bg-red-50 border border-red-200 text-red-650 rounded-[20px] font-bold text-xs">
+                {errorMsg}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
@@ -122,6 +140,7 @@ export const ChefStock = ({ user }: { user: any }) => {
                 </label>
                 <input 
                   type="number" 
+                  name="amount"
                   step="any" 
                   required
                   value={wastageWeight}
@@ -133,6 +152,8 @@ export const ChefStock = ({ user }: { user: any }) => {
               <div className="space-y-1">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Alasan</label>
                 <select 
+                  name="reason"
+                  id="reason"
                   value={wastageReason}
                   onChange={(e) => setWastageReason(e.target.value)}
                   className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all"

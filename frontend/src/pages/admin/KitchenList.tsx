@@ -26,6 +26,9 @@ export const KitchenList = () => {
   const [mapsError, setMapsError] = React.useState<string | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = React.useState(false);
   const [newKitchenDetails, setNewKitchenDetails] = React.useState<any>(null);
+  const [nameError, setNameError] = React.useState("");
+  const [submitError, setSubmitError] = React.useState("");
+  const [deleteError, setDeleteError] = React.useState("");
 
   const todayIndex = new Date().getDay();
   let todayDayName = INDO_DAYS[todayIndex];
@@ -104,9 +107,15 @@ export const KitchenList = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentKitchen?.name || !currentKitchen?.address) return;
+    if (!currentKitchen?.name) {
+      setNameError("Nama dapur wajib diisi");
+      return;
+    }
+    if (!currentKitchen?.address) return;
 
     try {
+      setNameError("");
+      setSubmitError("");
       if (currentKitchen.id) {
         await api.updateKitchen(currentKitchen.id, currentKitchen);
       } else {
@@ -127,16 +136,19 @@ export const KitchenList = () => {
       fetchKitchens();
     } catch (error) {
       console.error("Operation failed", error);
+      setSubmitError("Nama dapur sudah digunakan. Silakan gunakan nama lain.");
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Apakah Anda yakin ingin menghapus dapur ini?")) return;
     try {
+      setDeleteError("");
       await api.deleteKitchen(id);
       fetchKitchens();
     } catch (error) {
       console.error("Penghapusan gagal", error);
+      setDeleteError("Dapur tidak dapat dihapus karena masih memiliki relasi data aktif.");
     }
   };
 
@@ -165,6 +177,9 @@ export const KitchenList = () => {
           onClick={() => { 
             setCurrentKitchen({ name: "", address: "", capacity: 1000 }); 
             setMapsError(null);
+            setNameError("");
+            setSubmitError("");
+            setDeleteError("");
             fetchStaff();
             setIsModalOpen(true); 
           }}
@@ -174,6 +189,12 @@ export const KitchenList = () => {
           Tambah Dapur
         </Button>
       </div>
+
+      {deleteError && (
+        <div id="kitchenDeleteError" className="p-4 bg-red-50 border border-red-200 text-red-650 rounded-[24px] font-bold text-xs">
+          {deleteError}
+        </div>
+      )}
 
       {/* Filters & Search */}
       <div className="flex flex-col md:flex-row gap-6">
@@ -220,8 +241,38 @@ export const KitchenList = () => {
                     <div className="w-16 h-16 bg-slate-50 rounded-[24px] flex items-center justify-center text-slate-400 shadow-inner group-hover:bg-primary group-hover:text-white transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
                       <Utensils className="w-8 h-8" />
                     </div>
-                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-primary-light group-hover:text-primary transition-colors">
-                      <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setCurrentKitchen(kitchen);
+                          setNameError("");
+                          setSubmitError("");
+                          setDeleteError("");
+                          setIsModalOpen(true);
+                        }}
+                        className="w-9 h-9 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-650 flex items-center justify-center transition-colors cursor-pointer"
+                        title="Edit Dapur"
+                        aria-label={`Edit Dapur ${kitchen.name}`}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDelete(kitchen.id);
+                        }}
+                        className="w-9 h-9 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors cursor-pointer"
+                        title="Hapus Dapur"
+                        aria-label={`Hapus Dapur ${kitchen.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-primary-light group-hover:text-primary transition-colors">
+                        <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                      </div>
                     </div>
                   </div>
                 
@@ -287,6 +338,11 @@ export const KitchenList = () => {
         title={currentKitchen?.id ? "Edit Dapur" : "Tambah Dapur Baru"}
       >
         <form onSubmit={handleSubmit} className="space-y-6 py-2">
+          {submitError && (
+            <div id="kitchenSubmitError" className="p-4 bg-red-50 border border-red-200 text-red-655 rounded-[20px] font-bold text-xs">
+              {submitError}
+            </div>
+          )}
           <div className="space-y-3">
             <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-1">Informasi Utama</label>
             <div className="relative group/input">
@@ -296,10 +352,18 @@ export const KitchenList = () => {
                 className="w-full bg-slate-50 border-2 border-transparent rounded-[20px] pl-14 pr-6 py-4 focus:bg-white focus:border-primary outline-none transition-all font-bold text-slate-800 tracking-tight text-sm placeholder:text-slate-450 shadow-sm"
                 placeholder="Nama Dapur (Contoh: Dapur Pusat Jakarta)"
                 value={currentKitchen?.name || ""}
-                onChange={(e) => setCurrentKitchen(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => {
+                  setNameError("");
+                  setCurrentKitchen(prev => ({ ...prev ? { ...prev, name: e.target.value } : { name: e.target.value } }));
+                }}
                 required
               />
             </div>
+            {nameError && (
+              <p id="kitchenNameError" className="text-xs font-black text-red-500 mt-1 px-1">
+                {nameError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-3">

@@ -221,6 +221,11 @@ async function reportWastage(req, res) {
       displayUnit = getDisplayUnit(currentTotal, dbUnit, cap, pkgUnit);
       
       const discardedInStandardUnit = convertUnit(Number(weight), displayUnit, pkgUnit || dbUnit, cap, pkgUnit);
+      if (discardedInStandardUnit > currentTotal) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({ error: 'Jumlah wastage melebihi stok yang tersedia (Stok tidak cukup).' });
+      }
       const newTotal = Math.max(0, currentTotal - discardedInStandardUnit);
       
       if (!isNaN(cap) && cap > 0) {

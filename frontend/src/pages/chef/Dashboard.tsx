@@ -83,8 +83,7 @@ export const ChefDashboard = ({ user }: { user: any }) => {
 
   const handleStartTask = async (taskId: string) => {
     if (!isVerified) {
-      alert("Harap lakukan verifikasi stok harian terlebih dahulu di halaman Antrean Masak.");
-      navigate("/chef/queue");
+      setErrorMsg("Harap lakukan verifikasi stok harian terlebih dahulu.");
       return;
     }
     try {
@@ -92,14 +91,13 @@ export const ChefDashboard = ({ user }: { user: any }) => {
       showNotification("Sukses memulai proses masak!");
       loadDashboardData(true);
     } catch (err: any) {
-      alert(err.message || "Gagal memulai tugas.");
+      setErrorMsg(err.message || "Gagal memulai tugas.");
     }
   };
 
   const handleFinishTask = async (taskId: string) => {
     if (!isVerified) {
-      alert("Harap lakukan verifikasi stok harian terlebih dahulu di halaman Antrean Masak.");
-      navigate("/chef/queue");
+      setErrorMsg("Harap lakukan verifikasi stok harian terlebih dahulu.");
       return;
     }
     try {
@@ -107,7 +105,7 @@ export const ChefDashboard = ({ user }: { user: any }) => {
       showNotification("Masakan telah selesai dimasak!");
       loadDashboardData(true);
     } catch (err: any) {
-      alert(err.message || "Gagal menyelesaikan tugas.");
+      setErrorMsg(err.message || "Gagal menyelesaikan tugas.");
     }
   };
 
@@ -408,7 +406,7 @@ export const ChefDashboard = ({ user }: { user: any }) => {
             ) : (
               <div className="space-y-4">
                 {todayMenu.map((item: any, idx: number) => {
-                  const isNotStarted = item.status === 'NotStarted' || item.status === 'Preparing';
+                  const isNotStarted = item.status === 'NotStarted' || item.status === 'Preparing' || item.status === 'Pending';
                   const isCooking = item.status === 'Cooking';
                   const isReady = item.status === 'Ready';
 

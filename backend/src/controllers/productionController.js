@@ -303,6 +303,42 @@ async function startProductionLog(req, res) {
       const menu = menus[0];
       const [ingredients] = await connection.query('SELECT * FROM ingredients WHERE menuId = ?', [menu.id]);
 
+      // Enforce stock availability check
+      for (const ing of ingredients) {
+        const totalNeeded = Number(ing.perPortion) * plan.servings;
+        let totalAvailable = 0;
+
+        const [invItems] = await connection.query('SELECT * FROM inventory WHERE LOWER(name) = ?', [ing.name.toLowerCase()]);
+        if (invItems.length > 0) {
+          const invItem = invItems[0];
+          const [batches] = await connection.query(
+            'SELECT * FROM inventory_batches WHERE inventoryId = ? AND kitchenId = ?',
+            [invItem.id, plan.kitchenId]
+          );
+
+          for (const batch of batches) {
+            const qtyPacked = Number(batch.qty_packed) || 0;
+            const qtyLoose = Number(batch.qty_loose) || 0;
+            const batchUnit = batch.unit || 'kg';
+            const cap = Number(batch.package_capacity);
+            const pkgUnit = (batch.package_unit || '').trim();
+
+            const currentTotal = (!isNaN(cap) && cap > 0 && pkgUnit) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
+            const targetUnit = pkgUnit || batchUnit;
+            const convertedVal = convertUnit(currentTotal, targetUnit, ing.unit, cap, pkgUnit);
+            totalAvailable += convertedVal;
+          }
+        }
+
+        if (totalAvailable < totalNeeded) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({ 
+            error: `Stok tidak mencukupi untuk bahan ${ing.name}. Butuh ${totalNeeded} ${ing.unit}, tersedia ${totalAvailable} ${ing.unit}.` 
+          });
+        }
+      }
+
       for (const ing of ingredients) {
         const totalNeeded = Number(ing.perPortion) * plan.servings;
         let remainingNeeded = totalNeeded;

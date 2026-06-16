@@ -1,4 +1,4 @@
-export type Status = 'NotStarted' | 'Preparing' | 'Cooking' | 'Ready' | 'Success' | 'Waste';
+export type Status = 'NotStarted' | 'Preparing' | 'Cooking' | 'Ready' | 'Success' | 'Waste' | 'Pending';
 
 export interface Kitchen {
   id: string;

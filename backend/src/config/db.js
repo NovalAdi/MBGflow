@@ -602,6 +602,16 @@ async function seedDatabase() {
           { batchId: 'b4', qty_packed: 3, qty_loose: 15.0 },
           { batchId: 'b9', qty_packed: 10, qty_loose: 2.0 }
         ])
+      },
+      {
+        id: 'v-1003',
+        kitchenId: 'k2',
+        verifiedAt: new Date().toISOString(), // Verified today
+        verifiedBy: 'Chef Budi Tangerang',
+        details: JSON.stringify([
+          { batchId: 'b2a', qty_packed: 7, qty_loose: 5.0 },
+          { batchId: 'b4', qty_packed: 3, qty_loose: 15.0 }
+        ])
       }
     ];
     for (const sv of stockVerifications) {

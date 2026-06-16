@@ -124,8 +124,9 @@ export const Restock = ({ user }: { user: any }) => {
   const [checkingAvailability, setCheckingAvailability] = React.useState(false);
   const [submittingRequest, setSubmittingRequest] = React.useState(false);
   
-  // Success states
+  // Success/Error states
   const [successMsg, setSuccessMsg] = React.useState("");
+  const [formError, setFormError] = React.useState("");
 
   // Tracking detail modal state
   const [selectedTrackingRequest, setSelectedTrackingRequest] = React.useState<any>(null);
@@ -584,9 +585,12 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
     });
 
     if (invalid) {
+      setFormError("Jumlah wajib diisi");
       alert("Harap isi semua kolom bahan, jumlah, dan satuan!");
       return;
     }
+
+    setFormError("");
 
     setSubmittingRequest(true);
     try {
@@ -961,6 +965,12 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
                 })}
               </div>
 
+              {formError && (
+                <div id="restockFormError" className="p-4 bg-red-50 border border-red-200 text-red-650 rounded-2xl font-bold text-xs">
+                  {formError}
+                </div>
+              )}
+
               {/* Form Controls */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-4 border-t border-slate-100">
                 <div className="flex flex-wrap items-center gap-3">
@@ -1145,6 +1155,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
                   <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Jumlah</th>
                   <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Urgensi</th>
                   <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Tujuan</th>
+                  <th className="p-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white/50 backdrop-blur-sm">
@@ -1182,6 +1193,26 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
                         </span>
                       </td>
                       <td className="p-4 text-xs font-bold text-slate-650 tracking-tight">{supplierDisplay}</td>
+                      <td className="p-4 text-xs font-bold text-slate-650 tracking-tight">
+                        <span className={cn(
+                          "px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider inline-block border",
+                          req.status === "Approved"
+                            ? "bg-blue-50 text-blue-600 border-blue-100/60"
+                            : req.status === "Delivered" || req.status === "Selesai"
+                            ? "bg-emerald-50 text-emerald-600 border-emerald-100/60"
+                            : req.status === "Pending"
+                            ? "bg-amber-50 text-amber-600 border-amber-100/60 shadow-sm"
+                            : "bg-red-50 text-red-650 border-red-100/60"
+                        )}>
+                          {req.status === "Pending" 
+                            ? "Menunggu (Pending)" 
+                            : req.status === "Approved" 
+                            ? "Disetujui (Approved)" 
+                            : req.status === "Denied" || req.status === "Rejected"
+                            ? "Ditolak (Rejected)"
+                            : "Selesai (Delivered)"}
+                        </span>
+                      </td>
                     </tr>
                   );
                 })}
@@ -1249,12 +1280,12 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
                         : "bg-red-50 text-red-650 border-red-100/60"
                     )}>
                       {selectedTrackingRequest.status === "Pending" 
-                        ? "Menunggu" 
+                        ? "Menunggu (Pending)" 
                         : selectedTrackingRequest.status === "Approved" 
-                        ? "Disetujui" 
+                        ? "Disetujui (Approved)" 
                         : selectedTrackingRequest.status === "Denied" || selectedTrackingRequest.status === "Rejected"
-                        ? "Ditolak"
-                        : "Selesai"}
+                        ? "Ditolak (Rejected)"
+                        : "Selesai (Delivered)"}
                     </span>
                   </div>
                 </div>

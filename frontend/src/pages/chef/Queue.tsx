@@ -5,7 +5,7 @@ import { Badge } from "@/src/components/ui/Badge";
 import { Modal } from "@/src/components/ui/Modal";
 import { api } from "@/src/services/api";
 import { ProductionLog } from "@/src/types";
-import { Play, CheckCircle2, Thermometer, MessageSquare, QrCode, ClipboardList, Info } from "lucide-react";
+import { Play, CheckCircle2, Thermometer, MessageSquare, QrCode, ClipboardList, Info, AlertTriangle, AlertCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { cn } from "@/src/lib/utils";
 
@@ -23,6 +23,10 @@ export const ChefQueue = ({ user }: { user: any }) => {
 
   // Stock Verification States
   const [isVerified, setIsVerified] = React.useState(true);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
+  const [temperature, setTemperature] = React.useState("");
+  const [qaError, setQaError] = React.useState<string | null>(null);
+  const [leftoverStock, setLeftoverStock] = React.useState<Record<string, string>>({});
   const [isVerificationModalOpen, setVerificationModalOpen] = React.useState(false);
   const [verificationData, setVerificationData] = React.useState<{
     lastMenu: string | null;
@@ -34,16 +38,20 @@ export const ChefQueue = ({ user }: { user: any }) => {
   const [otherInputs, setOtherInputs] = React.useState<Record<string, string>>({});
   const [isVerifying, setIsVerifying] = React.useState(false);
 
+  const [kitchenStock, setKitchenStock] = React.useState<any[]>([]);
+
   const fetchTasks = React.useCallback(async () => {
     try {
-      const [tasksData, menusData, verificationStatus] = await Promise.all([
+      const [tasksData, menusData, verificationStatus, kitchenData] = await Promise.all([
         api.getActivity(user?.kitchenId),
         api.getMenus(),
-        api.checkStockVerificationStatus(user?.kitchenId)
+        api.checkStockVerificationStatus(user?.kitchenId),
+        user?.kitchenId ? api.getKitchenDetail(user.kitchenId) : Promise.resolve(null)
       ]);
       setTasks(tasksData || []);
       setMenus(menusData || []);
       setIsVerified(verificationStatus.verified);
+      setKitchenStock(kitchenData?.stock || []);
     } catch (error) {
       console.error("Failed to fetch tasks and menus", error);
     }
@@ -54,12 +62,15 @@ export const ChefQueue = ({ user }: { user: any }) => {
   }, [fetchTasks]);
 
   const handleAction = async (task: ExtendedProductionLog) => {
-    if (task.status === 'NotStarted' || task.status === 'Preparing') {
+    if (task.status === 'NotStarted' || task.status === 'Preparing' || task.status === 'Pending') {
       try {
         const status = await api.checkStockVerificationStatus(user?.kitchenId);
         if (status.verified) {
           api.startTask(task.id).then(() => {
+            setErrorMsg(null);
             fetchTasks();
+          }).catch((err: any) => {
+            setErrorMsg(err.message || "Stok kosong atau stok tidak mencukupi untuk bahan baku utama!");
           });
         } else {
           setPendingTaskId(task.id);
@@ -91,11 +102,17 @@ export const ChefQueue = ({ user }: { user: any }) => {
         console.error("Failed to perform stock verification check", err);
         // Fallback: start task anyway
         api.startTask(task.id).then(() => {
+          setErrorMsg(null);
           fetchTasks();
+        }).catch((err: any) => {
+          setErrorMsg(err.message || "Stok kosong atau stok tidak mencukupi untuk bahan baku utama!");
         });
       }
     } else if (task.status === 'Cooking' || task.status === 'Ready') {
       setSelectedTask(task);
+      setTemperature("");
+      setLeftoverStock({});
+      setQaError(null);
       setQAModalOpen(true);
     }
   };
@@ -154,7 +171,12 @@ export const ChefQueue = ({ user }: { user: any }) => {
 
       // After verification, start the task if we have a valid pendingTaskId
       if (pendingTaskId && pendingTaskId !== "dummy") {
-        await api.startTask(pendingTaskId);
+        try {
+          await api.startTask(pendingTaskId);
+          setErrorMsg(null);
+        } catch (err: any) {
+          setErrorMsg(err.message || "Stok kosong atau stok tidak mencukupi untuk bahan baku utama!");
+        }
       }
       
       setIsVerified(true);
@@ -175,6 +197,7 @@ export const ChefQueue = ({ user }: { user: any }) => {
   const getStatusConfig = (status: ProductionLog['status']) => {
     switch (status) {
       case 'NotStarted':
+      case 'Pending':
         return { label: 'ANTREAN', color: 'bg-slate-100 text-slate-500', btnText: 'Mulai Masak', icon: Play };
       case 'Preparing':
         return { label: 'PERSIAPAN', color: 'bg-indigo-50 text-indigo-500', btnText: 'Mulai Masak', icon: Play };
@@ -188,6 +211,31 @@ export const ChefQueue = ({ user }: { user: any }) => {
   };
 
   const submitQA = () => {
+    const tempVal = parseFloat(temperature);
+    if (isNaN(tempVal)) {
+      setQaError("Suhu wajib diisi!");
+      return;
+    }
+    if (tempVal < 60) {
+      setQaError("Suhu makanan kurang panas / di bawah standar keamanan pangan!");
+      return;
+    }
+
+    let hasNegative = false;
+    Object.keys(leftoverStock).forEach(key => {
+      const val = parseFloat(leftoverStock[key]);
+      if (!isNaN(val) && val < 0) {
+        hasNegative = true;
+      }
+    });
+
+    if (hasNegative) {
+      setQaError("Sisa bahan baku tidak boleh bernilai negatif!");
+      return;
+    }
+
+    setQaError(null);
+
     api.finishTask({ productionId: selectedTask?.id }).then(res => {
       // User requested: Cooking -> Ready should not generate QR
       if (selectedTask?.status === 'Ready') {
@@ -200,6 +248,28 @@ export const ChefQueue = ({ user }: { user: any }) => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      {errorMsg && (
+        <Card className="bg-red-50 border border-red-100 p-4 rounded-2xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-100 text-red-500 rounded-2xl shrink-0">
+              <ClipboardList className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="font-extrabold text-slate-800 text-sm tracking-tight">Gagal Memproses Antrean</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{errorMsg}</p>
+            </div>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-slate-400 hover:text-slate-600 font-bold border-none" 
+            onClick={() => setErrorMsg(null)}
+          >
+            Tutup
+          </Button>
+        </Card>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Antrean Masak</h2>
@@ -278,7 +348,7 @@ export const ChefQueue = ({ user }: { user: any }) => {
                 setOtherInputs(newOtherInputs);
 
                 // Set a default pending task id as the first NotStarted task
-                const firstNotStarted = tasks.find(t => t.status === 'NotStarted' || t.status === 'Preparing');
+                const firstNotStarted = tasks.find(t => t.status === 'NotStarted' || t.status === 'Preparing' || t.status === 'Pending');
                 if (firstNotStarted) {
                   setPendingTaskId(firstNotStarted.id);
                 } else if (tasks.length > 0) {
@@ -310,9 +380,30 @@ export const ChefQueue = ({ user }: { user: any }) => {
               const needed = ing.perPortion * task.servings;
               return {
                 name: ing.name,
-                amount: `${needed.toFixed(2)} ${ing.unit}`
+                amount: `${needed.toFixed(2)} ${ing.unit}`,
+                numericAmount: needed,
+                unit: ing.unit
               };
             }) : [];
+
+            const isStockInsufficient = ingredients.some(ing => {
+              const stockItem = kitchenStock.find(s => s.name.toLowerCase() === ing.name.toLowerCase());
+              if (!stockItem) return true;
+              let totalAvailable = 0;
+              if (stockItem.batches && stockItem.batches.length > 0) {
+                stockItem.batches.forEach((b: any) => {
+                  const qtyPacked = Number(b.qty_packed) || 0;
+                  const qtyLoose = Number(b.qty_loose) || 0;
+                  const cap = Number(b.package_capacity);
+                  totalAvailable += (!isNaN(cap) && cap > 0) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
+                });
+              } else {
+                totalAvailable = parseFloat(stockItem.totalWeight) || 0;
+              }
+              return totalAvailable < ing.numericAmount;
+            });
+
+            const showStockWarning = isStockInsufficient && (task.status === 'NotStarted' || task.status === 'Preparing' || task.status === 'Pending');
 
             return (
               <Card key={task.id} className="p-8 group hover:shadow-2xl hover:shadow-primary/10 transition-all rounded-[40px] border-0 bg-white flex flex-col justify-between h-full relative overflow-hidden shadow-sm">
@@ -336,19 +427,45 @@ export const ChefQueue = ({ user }: { user: any }) => {
                       <span className="w-1 h-1 rounded-full bg-slate-200" />
                       <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Shift Pagi</span>
                     </div>
-                  </div>
-
-                  {/* Ingredients List Section */}
+                  </div>                  {/* Ingredients List Section */}
                   <div className="mb-6 pt-4 border-t border-slate-100">
                     <p className="text-[9px] font-black text-slate-450 uppercase tracking-[0.2em] mb-3">Rincian Bahan Baku</p>
                     {ingredients.length > 0 ? (
                       <div className="max-h-28 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                        {ingredients.map((ing: any, i: number) => (
-                          <div key={i} className="flex justify-between items-center bg-slate-50 rounded-xl px-4 py-2 border border-slate-100/50">
-                            <span className="text-xs font-bold text-slate-700">{ing.name}</span>
-                            <span className="text-xs font-black text-primary tracking-tight">{ing.amount}</span>
-                          </div>
-                        ))}
+                        {ingredients.map((ing: any, i: number) => {
+                          const stockItem = kitchenStock.find(s => s.name.toLowerCase() === ing.name.toLowerCase());
+                          let totalAvailable = 0;
+                          if (stockItem) {
+                            if (stockItem.batches && stockItem.batches.length > 0) {
+                              stockItem.batches.forEach((b: any) => {
+                                const qtyPacked = Number(b.qty_packed) || 0;
+                                const qtyLoose = Number(b.qty_loose) || 0;
+                                const cap = Number(b.package_capacity);
+                                totalAvailable += (!isNaN(cap) && cap > 0) ? (qtyPacked * cap) + qtyLoose : qtyLoose;
+                              });
+                            } else {
+                              totalAvailable = parseFloat(stockItem.totalWeight) || 0;
+                            }
+                          }
+                          const isIngInsufficient = totalAvailable < ing.numericAmount;
+
+                          return (
+                            <div key={i} className={cn(
+                              "flex justify-between items-center rounded-xl px-4 py-2 border",
+                              isIngInsufficient && (task.status === 'NotStarted' || task.status === 'Preparing' || task.status === 'Pending')
+                                ? "bg-red-50/55 border-red-100 text-red-700 font-bold"
+                                : "bg-slate-50 border-slate-100/50 text-slate-700"
+                            )}>
+                              <span className="text-xs font-bold">{ing.name}</span>
+                              <span className={cn(
+                                "text-xs font-black tracking-tight",
+                                isIngInsufficient && (task.status === 'NotStarted' || task.status === 'Preparing' || task.status === 'Pending')
+                                  ? "text-red-650 font-black"
+                                  : "text-primary font-black"
+                              )}>{ing.amount}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-[10px] text-slate-550 italic">Memuat rincian bahan...</p>
@@ -356,12 +473,27 @@ export const ChefQueue = ({ user }: { user: any }) => {
                   </div>
                 </div>
 
+                {showStockWarning && (
+                  <div id="alert_NoStockError" className="mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl flex gap-3 items-start animate-pulse">
+                    <AlertCircle className="w-5 h-5 text-red-650 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-black text-red-800 uppercase tracking-widest">Stok tidak mencukupi</p>
+                      <p className="text-[10px] leading-relaxed text-red-700 font-bold mt-1">
+                        Bahan baku kosong atau kurang untuk memenuhi jumlah porsi. Mulai masak dinonaktifkan.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Action Buttons at the bottom */}
                 <div className="grid grid-cols-5 gap-3 mt-auto pt-2">
                   <Button 
+                     disabled={showStockWarning || !isVerified}
                      className={cn(
                       "col-span-4 h-12 rounded-[20px] text-[10px] font-black uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center cursor-pointer",
-                      task.status === 'Ready' 
+                      (showStockWarning || !isVerified)
+                        ? "bg-slate-300 text-slate-500 shadow-none cursor-not-allowed pointer-events-none opacity-50"
+                        : task.status === 'Ready' 
                         ? "bg-green-500 hover:bg-green-600 shadow-green-500/20 text-white" 
                         : task.status === 'Cooking'
                         ? "bg-orange-500 hover:bg-orange-600 shadow-orange-500/20 text-white"
@@ -465,13 +597,30 @@ export const ChefQueue = ({ user }: { user: any }) => {
         className="max-w-3xl"
       >
         <div className="space-y-6">
+          {qaError && (
+            <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-xs font-bold shadow-sm">
+              {qaError}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
                 <Thermometer className="w-3.5 h-3.5 text-red-500" />
                 Suhu Akhir (°C)
               </span>
-              <input type="number" step="0.1" className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all" placeholder="75.0" />
+              <input 
+                type="number" 
+                name="suhu"
+                step="0.1" 
+                className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all" 
+                placeholder="75.0" 
+                value={temperature}
+                onChange={(e) => {
+                  setTemperature(e.target.value);
+                  setQaError(null);
+                }}
+              />
             </div>
             <div className="space-y-2">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
@@ -495,7 +644,17 @@ export const ChefQueue = ({ user }: { user: any }) => {
                 <div key={i} className="flex items-center justify-between gap-6 p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:bg-white hover:border-primary/20 transition-all">
                   <span className="text-sm font-bold text-slate-700">{item.name}</span>
                   <div className="flex items-center gap-4">
-                    <input type="text" className="w-28 text-right bg-white border-2 border-slate-100 focus:border-primary rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none transition-all" placeholder="Sisa" />
+                    <input 
+                      type="text" 
+                      name={item.name}
+                      value={leftoverStock[item.name] || ""}
+                      onChange={(e) => {
+                        setLeftoverStock(prev => ({ ...prev, [item.name]: e.target.value }));
+                        setQaError(null);
+                      }}
+                      className="w-28 text-right bg-white border-2 border-slate-100 focus:border-primary rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none transition-all" 
+                      placeholder="Sisa" 
+                    />
                     <span className="text-xs font-bold text-slate-500 w-6 uppercase">{item.unit}</span>
                   </div>
                 </div>
