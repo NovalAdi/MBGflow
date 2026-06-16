@@ -207,7 +207,7 @@ export const api = {
     return request<any[]>(`/stock-requests${query}`);
   },
 
-  finishTask: async (data: { productionId: string }): Promise<{ success: boolean; handoverId: string }> => {
+  finishTask: async (data: { productionId: string; notes?: string }): Promise<{ success: boolean; handoverId: string }> => {
     return request<{ success: boolean; handoverId: string }>("/production-logs/finish", {
       method: "POST",
       body: JSON.stringify(data),
@@ -276,6 +276,13 @@ export const api = {
     return request<{ success: boolean; verificationId: string }>("/stock-verifications", {
       method: "POST",
       body: JSON.stringify(data),
+    });
+  },
+
+  validateStockArrival: async (requestIds: string[]): Promise<{ success: boolean; processedRequests: string[] }> => {
+    return request<{ success: boolean; processedRequests: string[] }>("/stock-requests/validate-arrival", {
+      method: "POST",
+      body: JSON.stringify({ requestIds }),
     });
   },
 };

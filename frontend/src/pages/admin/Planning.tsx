@@ -462,6 +462,9 @@ export const ProductionPlanning = () => {
   const [selectedDay, setSelectedDay] = React.useState("");
   const [isEditMode, setIsEditMode] = React.useState(false);
   const [portionsError, setPortionsError] = React.useState("");
+  const [formError, setFormError] = React.useState("");
+  const [alertMessage, setAlertMessage] = React.useState<{ title: string; message: string } | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = React.useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = React.useState({
@@ -509,11 +512,12 @@ export const ProductionPlanning = () => {
   const handleSavePlan = async () => {
     if (!formData.portions || formData.portions <= 0) {
       setPortionsError("Porsi wajib diisi");
-      alert("Harap masukkan jumlah porsi yang valid.");
+      setAlertMessage({ title: "Validasi Gagal", message: "Harap masukkan jumlah porsi yang valid." });
       return;
     }
 
     try {
+      setFormError("");
       if (isEditMode) {
         await api.updateProductionPlan(formData.id, {
           day: selectedDay,
@@ -535,34 +539,24 @@ export const ProductionPlanning = () => {
       setFormModalOpen(false);
       setIsEditMode(false);
       await fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving production plan:", error);
-      alert("Gagal menyimpan rencana produksi: " + (error instanceof Error ? error.message : String(error)));
+      setFormError(error.message || "Gagal menyimpan rencana produksi");
     }
   };
 
   const handleDeletePlan = async (planId: string) => {
-    if (!window.confirm("Apakah Anda yakin ingin menghapus rencana produksi ini?")) return;
-    
-    try {
-      await api.deleteProductionPlan(planId);
-      setFormModalOpen(false);
-      setIsEditMode(false);
-      await fetchData();
-    } catch (error) {
-      console.error("Error deleting production plan:", error);
-      alert("Gagal menghapus rencana produksi: " + (error instanceof Error ? error.message : String(error)));
-    }
+    setConfirmDeleteId(planId);
   };
 
   const handleSendShortageNotification = async () => {
     if (!formData.kitchenId) return;
     try {
       await api.createNotification(formData.kitchenId, shortageMessage);
-      alert("Notifikasi kekurangan bahan berhasil dikirim ke Dapur / Akun Chef!");
+      setAlertMessage({ title: "Notifikasi Terkirim", message: "Notifikasi kekurangan bahan berhasil dikirim ke Dapur / Akun Chef!" });
     } catch (error) {
       console.error("Failed to send manual notification:", error);
-      alert("Gagal mengirim notifikasi: " + (error instanceof Error ? error.message : String(error)));
+      setAlertMessage({ title: "Gagal Mengirim", message: "Gagal mengirim notifikasi: " + (error instanceof Error ? error.message : String(error)) });
     }
   };
 
@@ -578,6 +572,7 @@ export const ProductionPlanning = () => {
       note: item.note || ""
     });
     setPortionsError("");
+    setFormError("");
     setFormModalOpen(true);
   };
 
@@ -596,6 +591,7 @@ export const ProductionPlanning = () => {
       note: ""
     });
     setPortionsError("");
+    setFormError("");
     setFormModalOpen(true);
   };
 
@@ -753,6 +749,11 @@ export const ProductionPlanning = () => {
       >
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-10">
           <div className="lg:col-span-3 space-y-8">
+            {formError && (
+              <div id="planFormError" className="p-4 bg-red-50 border border-red-200 text-red-655 rounded-[20px] font-bold text-xs">
+                {formError}
+              </div>
+            )}
             <div className="p-6 bg-slate-50 rounded-2xl space-y-6 border border-slate-100">
               <div className="space-y-2">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Pilih Menu</span>
@@ -939,6 +940,71 @@ export const ProductionPlanning = () => {
             >
               <Check className="w-4 h-4 mr-2" />
               {isEditMode ? "Simpan Perubahan" : "Simpan Rencana"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Custom Alert Modal */}
+      <Modal
+        isOpen={alertMessage !== null}
+        onClose={() => setAlertMessage(null)}
+        title={alertMessage?.title || "Notifikasi"}
+      >
+        <div className="space-y-6 py-2">
+          <p className="text-sm font-bold text-slate-600 leading-relaxed">
+            {alertMessage?.message}
+          </p>
+          <div className="pt-2">
+            <Button 
+              className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md"
+              onClick={() => setAlertMessage(null)}
+            >
+              Tutup
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        title="Hapus Rencana Produksi"
+      >
+        <div className="space-y-6 py-2">
+          <p className="text-sm font-bold text-slate-600 leading-relaxed">
+            Apakah Anda yakin ingin menghapus rencana produksi ini? Tindakan ini tidak dapat dibatalkan.
+          </p>
+          <div className="flex gap-3">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs text-slate-400 hover:bg-slate-50"
+              onClick={() => setConfirmDeleteId(null)}
+            >
+              Batalkan
+            </Button>
+            <Button 
+              type="button" 
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs bg-red-500 hover:bg-red-600 text-white"
+              onClick={async () => {
+                if (!confirmDeleteId) return;
+                const targetId = confirmDeleteId;
+                setConfirmDeleteId(null);
+                try {
+                  setFormError("");
+                  await api.deleteProductionPlan(targetId);
+                  setFormModalOpen(false);
+                  setIsEditMode(false);
+                  await fetchData();
+                } catch (error: any) {
+                  console.error("Error deleting production plan:", error);
+                  setFormError(error.message || "Gagal menghapus rencana produksi");
+                }
+              }}
+            >
+              Hapus
             </Button>
           </div>
         </div>

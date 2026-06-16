@@ -29,6 +29,9 @@ export const KitchenList = () => {
   const [nameError, setNameError] = React.useState("");
   const [submitError, setSubmitError] = React.useState("");
   const [deleteError, setDeleteError] = React.useState("");
+  const [isDeleteModalOpen, setDeleteModalOpen] = React.useState(false);
+  const [kitchenToDelete, setKitchenToDelete] = React.useState<Kitchen | null>(null);
+  const [successMsg, setSuccessMsg] = React.useState("");
 
   const todayIndex = new Date().getDay();
   let todayDayName = INDO_DAYS[todayIndex];
@@ -141,10 +144,13 @@ export const KitchenList = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus dapur ini?")) return;
     try {
       setDeleteError("");
       await api.deleteKitchen(id);
+      setSuccessMsg("Dapur berhasil dihapus! (Sukses)");
+      setTimeout(() => {
+        setSuccessMsg("");
+      }, 4000);
       fetchKitchens();
     } catch (error) {
       console.error("Penghapusan gagal", error);
@@ -168,6 +174,11 @@ export const KitchenList = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-10">
+      {successMsg && (
+        <div id="toastSuccess" className="fixed top-6 right-6 z-50 bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 border border-emerald-500 font-bold text-sm toast">
+          <span>{successMsg}</span>
+        </div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Manajemen Dapur</h1>
@@ -262,7 +273,9 @@ export const KitchenList = () => {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          handleDelete(kitchen.id);
+                          setKitchenToDelete(kitchen);
+                          setDeleteError("");
+                          setDeleteModalOpen(true);
                         }}
                         className="w-9 h-9 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors cursor-pointer"
                         title="Hapus Dapur"
@@ -534,6 +547,42 @@ export const KitchenList = () => {
               onClick={() => setIsSuccessModalOpen(false)}
             >
               Tutup & Selesai
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="Hapus Data Dapur"
+      >
+        <div className="space-y-6 py-2">
+          <p className="text-sm font-bold text-slate-600 leading-relaxed">
+            Apakah Anda yakin ingin menghapus dapur <span className="text-slate-800 font-extrabold">"{kitchenToDelete?.name}"</span>? Tindakan ini tidak dapat dibatalkan.
+          </p>
+
+          <div className="flex gap-3">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs text-slate-400 hover:bg-slate-50"
+              onClick={() => setDeleteModalOpen(false)}
+            >
+              Batalkan
+            </Button>
+            <Button 
+              type="button" 
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs bg-red-500 hover:bg-red-600 text-white"
+              onClick={async () => {
+                if (!kitchenToDelete) return;
+                setDeleteModalOpen(false);
+                await handleDelete(kitchenToDelete.id);
+                setKitchenToDelete(null);
+              }}
+            >
+              Hapus Dapur
             </Button>
           </div>
         </div>

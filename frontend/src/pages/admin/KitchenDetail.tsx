@@ -37,6 +37,7 @@ export const KitchenDetail = () => {
   const [newStaffPassword, setNewStaffPassword] = React.useState("password");
   const [staffError, setStaffError] = React.useState<string | null>(null);
   const [editingStaff, setEditingStaff] = React.useState<any | null>(null);
+  const [kitchenError, setKitchenError] = React.useState<string | null>(null);
 
   // States for deleting station confirmation modal
   const [isDeleteStationModalOpen, setIsDeleteStationModalOpen] = React.useState(false);
@@ -45,6 +46,9 @@ export const KitchenDetail = () => {
   // States for Google Maps URL resolution in edit kitchen modal
   const [isResolvingMaps, setIsResolvingMaps] = React.useState(false);
   const [mapsError, setMapsError] = React.useState<string | null>(null);
+
+  const [confirmDeleteStaffId, setConfirmDeleteStaffId] = React.useState<string | null>(null);
+  const [alertMessage, setAlertMessage] = React.useState<{ title: string; message: string } | null>(null);
 
   const fetchUnassignedStaff = React.useCallback(async () => {
     try {
@@ -165,15 +169,7 @@ export const KitchenDetail = () => {
   };
 
   const handleDeleteStaff = async (staffId: string) => {
-    if (!confirm("Apakah Anda yakin ingin mengeluarkan staf ini dari dapur?")) return;
-    try {
-      await api.deleteUser(staffId);
-      const updatedData = await api.getKitchenDetail(selectedKitchenId);
-      setDetail(updatedData);
-    } catch (err: any) {
-      console.error("Failed to delete staff member", err);
-      alert(err.message || "Gagal menghapus staf.");
-    }
+    setConfirmDeleteStaffId(staffId);
   };
 
   const handleUpdateKitchen = async (e: React.FormEvent) => {
@@ -281,6 +277,7 @@ export const KitchenDetail = () => {
 
   React.useEffect(() => {
     setDetail(null);
+    setKitchenError(null);
     api.getKitchenDetail(selectedKitchenId).then((data) => {
       setDetail(data);
       setCurrentKitchen(data);
@@ -336,8 +333,19 @@ export const KitchenDetail = () => {
       } else {
         setStations([]);
       }
+    }).catch((err) => {
+      console.error("Failed to fetch kitchen details:", err);
+      setKitchenError("Dapur tidak ditemukan");
     });
   }, [selectedKitchenId]);
+
+  if (kitchenError) {
+    return (
+      <div id="kitchenNotFoundError" className="p-8 text-center text-red-500 font-bold bg-red-50 rounded-2xl border border-red-200">
+        Dapur tidak ditemukan
+      </div>
+    );
+  }
 
   if (!detail) return null;
 
@@ -1140,6 +1148,70 @@ export const KitchenDetail = () => {
               onClick={handleConfirmDeleteStation}
             >
               Hapus
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Staff Confirmation Modal */}
+      <Modal
+        isOpen={confirmDeleteStaffId !== null}
+        onClose={() => setConfirmDeleteStaffId(null)}
+        title="Keluarkan Staf"
+      >
+        <div className="space-y-6 py-2">
+          <p className="text-sm font-bold text-slate-600 leading-relaxed">
+            Apakah Anda yakin ingin mengeluarkan staf ini dari dapur? Tindakan ini tidak dapat dibatalkan.
+          </p>
+          <div className="flex gap-3">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs text-slate-400 hover:bg-slate-50 border-none"
+              onClick={() => setConfirmDeleteStaffId(null)}
+            >
+              Batal
+            </Button>
+            <Button 
+              type="button"
+              variant="danger"
+              className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs"
+              onClick={async () => {
+                if (!confirmDeleteStaffId) return;
+                const targetId = confirmDeleteStaffId;
+                setConfirmDeleteStaffId(null);
+                try {
+                  await api.deleteUser(targetId);
+                  const updatedData = await api.getKitchenDetail(selectedKitchenId);
+                  setDetail(updatedData);
+                } catch (err: any) {
+                  console.error("Failed to delete staff member", err);
+                  setAlertMessage({ title: "Gagal Menghapus Staf", message: err.message || "Gagal menghapus staf." });
+                }
+              }}
+            >
+              Keluarkan
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Custom Alert Modal */}
+      <Modal
+        isOpen={alertMessage !== null}
+        onClose={() => setAlertMessage(null)}
+        title={alertMessage?.title || "Notifikasi"}
+      >
+        <div className="space-y-6 py-2">
+          <p className="text-sm font-bold text-slate-600 leading-relaxed">
+            {alertMessage?.message}
+          </p>
+          <div className="pt-2">
+            <Button 
+              className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md"
+              onClick={() => setAlertMessage(null)}
+            >
+              Tutup
             </Button>
           </div>
         </div>

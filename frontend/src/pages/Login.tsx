@@ -27,7 +27,7 @@ export const Login = ({ onLogin }: { onLogin: (user: any) => void }) => {
         if (response.user.role === 'Admin') {
           navigate("/admin");
         } else {
-          navigate("/chef/queue");
+          navigate("/chef/dashboard");
         }
       } else {
         setError("Kredensial tidak valid.");

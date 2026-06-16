@@ -30,6 +30,7 @@ export const RequestStock = () => {
   const [selectedRequest, setSelectedRequest] = React.useState<any>(null);
   const [adminNote, setAdminNote] = React.useState("");
   const [updatingId, setUpdatingId] = React.useState<string | null>(null);
+  const [modalError, setModalError] = React.useState<string | null>(null);
 
   // Bulk Action States
   const [isBulkModalOpen, setBulkModalOpen] = React.useState(false);
@@ -37,6 +38,7 @@ export const RequestStock = () => {
   const [bulkKitchenName, setBulkKitchenName] = React.useState("");
   const [bulkRequests, setBulkRequests] = React.useState<any[]>([]);
   const [bulkNote, setBulkNote] = React.useState("");
+  const [alertMessage, setAlertMessage] = React.useState<{ title: string; message: string } | null>(null);
 
   const loadRequests = React.useCallback(async () => {
     setLoading(true);
@@ -61,24 +63,26 @@ export const RequestStock = () => {
   const handleOpenDetailModal = (req: any) => {
     setSelectedRequest(req);
     setAdminNote(req.adminNotes || "");
+    setModalError(null);
     setDetailModalOpen(true);
   };
 
   const handleProcessRequest = async (status: string) => {
     if (!selectedRequest) return;
     setUpdatingId(selectedRequest.id);
+    setModalError(null);
 
     try {
       await api.updateStockRequestStatus(selectedRequest.id, status, adminNote);
       setDetailModalOpen(false);
+      setSelectedRequest(null);
       // Reload
       const data = await api.getStockRequests();
       setRequests(data);
-    } catch (error) {
-      alert("Gagal memperbarui status permintaan.");
+    } catch (error: any) {
+      setModalError(error.message || "Gagal memperbarui status permintaan.");
     } finally {
       setUpdatingId(null);
-      setSelectedRequest(null);
     }
   };
 
@@ -94,7 +98,7 @@ export const RequestStock = () => {
       await loadRequests();
     } catch (error) {
       console.error(error);
-      alert("Gagal menyetujui seluruh permintaan dapur ini.");
+      setAlertMessage({ title: "Gagal Menyetujui", message: "Gagal menyetujui seluruh permintaan dapur ini." });
     } finally {
       setLoading(false);
     }
@@ -121,7 +125,7 @@ export const RequestStock = () => {
       await loadRequests();
     } catch (error) {
       console.error(error);
-      alert("Gagal memproses perubahan masal dapur ini.");
+      setAlertMessage({ title: "Gagal Memproses", message: "Gagal memproses perubahan masal dapur ini." });
     } finally {
       setLoading(false);
     }
@@ -261,12 +265,6 @@ export const RequestStock = () => {
                         Setujui Semua
                       </Button>
                       <Button
-                        onClick={() => handleOpenBulkModal(kitchenName, pending, "Pending")}
-                        className="bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-black uppercase tracking-widest px-3.5 py-2 rounded-xl shadow-sm cursor-pointer"
-                      >
-                        Tunda Semua
-                      </Button>
-                      <Button
                         onClick={() => handleOpenBulkModal(kitchenName, pending, "Denied")}
                         className="bg-red-500 hover:bg-red-655 text-white text-[9px] font-black uppercase tracking-widest px-3.5 py-2 rounded-xl shadow-sm cursor-pointer"
                       >
@@ -324,12 +322,12 @@ export const RequestStock = () => {
                             <td className="p-4">
                               <span className={cn("px-2.5 py-1 rounded-full font-black text-[9px] uppercase tracking-wider border", statusColor)}>
                                 {req.status === "Pending" 
-                                  ? "Menunggu (Pending)" 
+                                  ? "Menunggu" 
                                   : req.status === "Approved" 
-                                  ? "Disetujui (Approved)" 
+                                  ? "Disetujui" 
                                   : req.status === "Denied" || req.status === "Rejected"
-                                  ? "Ditolak (Rejected)"
-                                  : "Selesai (Delivered)"}
+                                  ? "Ditolak"
+                                  : "Selesai"}
                               </span>
                             </td>
                           </tr>
@@ -393,11 +391,16 @@ export const RequestStock = () => {
       {/* Detail & Action Dialog Modal */}
       <Modal
         isOpen={isDetailModalOpen}
-        onClose={() => setDetailModalOpen(false)}
+        onClose={() => { setDetailModalOpen(false); setSelectedRequest(null); }}
         title={`Detail Permintaan Stock: #${selectedRequest?.id}`}
       >
         {selectedRequest && (
           <div className="space-y-6">
+            {modalError && (
+              <div id="requestModalError" className="p-4 bg-red-50 border border-red-200 text-red-655 rounded-[20px] font-bold text-xs">
+                {modalError}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-100 rounded-2xl text-xs font-bold text-slate-700">
               <div>
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5">Dapur Peminta</span>
@@ -444,12 +447,12 @@ export const RequestStock = () => {
                       : "bg-red-50 text-red-650 border-red-100/60"
                   )}>
                     {selectedRequest.status === "Pending" 
-                      ? "Menunggu (Pending)" 
+                      ? "Menunggu" 
                       : selectedRequest.status === "Approved" 
-                      ? "Disetujui (Approved)" 
+                      ? "Disetujui" 
                       : selectedRequest.status === "Denied" || selectedRequest.status === "Rejected"
-                      ? "Ditolak (Rejected)"
-                      : "Selesai (Delivered)"}
+                      ? "Ditolak"
+                      : "Selesai"}
                   </span>
                 </div>
               </div>
@@ -482,7 +485,7 @@ export const RequestStock = () => {
                   <textarea
                     rows={3}
                     className="w-full bg-slate-50 border-2 border-transparent rounded-2xl p-4 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all resize-none"
-                    placeholder="Tulis catatan (opsional untuk disetujui, wajib untuk tunda/tolak)..."
+                    placeholder="Tulis catatan (opsional untuk disetujui, wajib untuk ditolak)..."
                     value={adminNote}
                     onChange={(e) => setAdminNote(e.target.value)}
                   />
@@ -497,23 +500,16 @@ export const RequestStock = () => {
                     Approve
                   </Button>
                   <Button
-                    onClick={() => handleProcessRequest("Pending")}
-                    disabled={updatingId !== null || !adminNote}
-                    className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs bg-amber-500 hover:bg-amber-600 text-white cursor-pointer disabled:opacity-50"
-                  >
-                    Hold
-                  </Button>
-                  <Button
                     onClick={() => handleProcessRequest("Denied")}
                     disabled={updatingId !== null || !adminNote}
-                    className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs bg-red-500 hover:bg-red-650 text-white cursor-pointer disabled:opacity-50"
+                    className="flex-1 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs bg-red-500 hover:bg-red-655 text-white cursor-pointer disabled:opacity-50"
                   >
                     Deny
                   </Button>
                 </div>
                 {!adminNote && (
                   <p className="text-[9px] text-amber-655 font-bold text-center italic">
-                    * Wajib menulis catatan feedback untuk opsi Hold atau Deny.
+                    * Wajib menulis catatan feedback untuk opsi Deny.
                   </p>
                 )}
               </div>
@@ -550,6 +546,26 @@ export const RequestStock = () => {
           </p>
         </div>
       </div>
+      {/* Custom Alert Modal */}
+      <Modal
+        isOpen={alertMessage !== null}
+        onClose={() => setAlertMessage(null)}
+        title={alertMessage?.title || "Notifikasi"}
+      >
+        <div className="space-y-6 py-2">
+          <p className="text-sm font-bold text-slate-600 leading-relaxed">
+            {alertMessage?.message}
+          </p>
+          <div className="pt-2">
+            <Button 
+              className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md"
+              onClick={() => setAlertMessage(null)}
+            >
+              Tutup
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

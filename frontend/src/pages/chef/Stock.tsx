@@ -3,7 +3,7 @@ import { Card } from "@/src/components/ui/Card";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
 import { Modal } from "@/src/components/ui/Modal";
-import { Box, Trash2, AlertCircle, Calendar, Hash, ArrowUpDown, ChevronDown, Package, Warehouse } from "lucide-react";
+import { Box, Trash2, AlertCircle, Calendar, Hash, ArrowUpDown, ChevronDown, Package, Warehouse, CheckSquare, Check, Loader2 } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 import { isBefore, addDays, format, parseISO } from "date-fns";
 import { motion, AnimatePresence } from "motion/react";
@@ -20,11 +20,32 @@ export const ChefStock = ({ user }: { user: any }) => {
   const [wastageNotes, setWastageNotes] = React.useState("");
   const [successMsg, setSuccessMsg] = React.useState("");
 
+  // Validation States
+  const [isValidationModalOpen, setValidationModalOpen] = React.useState(false);
+  const [approvedRequests, setApprovedRequests] = React.useState<any[]>([]);
+  const [selectedRequestIds, setSelectedRequestIds] = React.useState<Record<string, boolean>>({});
+  const [validatingArrival, setValidatingArrival] = React.useState(false);
+  const [validationError, setValidationError] = React.useState("");
+
   const refreshStock = React.useCallback(() => {
     if (user?.kitchenId) {
       setLoading(true);
-      api.getKitchenDetail(user.kitchenId).then(res => {
-        setStockItems(res.stock || []);
+      Promise.all([
+        api.getKitchenDetail(user.kitchenId),
+        api.getStockRequests(user.kitchenId)
+      ]).then(([kitchenRes, requestsRes]) => {
+        setStockItems(kitchenRes.stock || []);
+        const approved = requestsRes.filter((r: any) => r.status === 'Approved');
+        setApprovedRequests(approved);
+        
+        const initialSelection: Record<string, boolean> = {};
+        approved.forEach((r: any) => {
+          initialSelection[r.id] = true;
+        });
+        setSelectedRequestIds(initialSelection);
+        setLoading(false);
+      }).catch(err => {
+        console.error("Failed to load stock detail and requests:", err);
         setLoading(false);
       });
     }
@@ -33,6 +54,30 @@ export const ChefStock = ({ user }: { user: any }) => {
   React.useEffect(() => {
     refreshStock();
   }, [refreshStock]);
+
+  const handleValidateArrival = async () => {
+    const idsToValidate = Object.keys(selectedRequestIds).filter(id => selectedRequestIds[id]);
+    if (idsToValidate.length === 0) {
+      setValidationError("Silakan pilih minimal satu bahan baku untuk divalidasi.");
+      return;
+    }
+
+    setValidatingArrival(true);
+    setValidationError("");
+    try {
+      await api.validateStockArrival(idsToValidate);
+      setSuccessMsg("Bahan baku berhasil divalidasi dan ditambahkan ke stok dapur!");
+      setValidationModalOpen(false);
+      refreshStock();
+      setTimeout(() => {
+        setSuccessMsg("");
+      }, 4000);
+    } catch (err: any) {
+      setValidationError(err?.message || "Gagal memvalidasi kedatangan bahan baku.");
+    } finally {
+      setValidatingArrival(false);
+    }
+  };
 
   // Grouping by material (which is already provided as an item in stock)
   // Our new structure has items, and each item has batches
@@ -91,7 +136,23 @@ export const ChefStock = ({ user }: { user: any }) => {
           <p className="text-slate-600 font-bold text-[11px] uppercase tracking-widest mt-2 px-1">Monitor persediaan per wadah (FEFO)</p>
         </div>
         <div className="flex items-center gap-3">
-           <Button variant="secondary" size="sm" className="h-9 text-[10px]" onClick={refreshStock}>Perbarui Stok</Button>
+           <Button 
+             variant="primary" 
+             size="sm" 
+             className="h-9 text-[10px] bg-primary hover:bg-primary-dark text-white rounded-xl font-bold flex items-center gap-1.5 shadow-md shadow-primary/10 active:scale-95 transition-all" 
+             onClick={() => {
+               setValidationError("");
+               setValidationModalOpen(true);
+             }}
+           >
+             <CheckSquare className="w-4 h-4" />
+             Validasi Bahan Baku Sampai
+             {approvedRequests.length > 0 && (
+               <span className="ml-1 px-1.5 py-0.5 text-[9px] bg-white text-primary rounded-full font-black animate-pulse">
+                 {approvedRequests.length}
+               </span>
+             )}
+           </Button>
         </div>
       </div>
 
@@ -178,6 +239,114 @@ export const ChefStock = ({ user }: { user: any }) => {
               Submit Laporan Kerugian
             </Button>
           </form>
+        </div>
+      </Modal>
+
+      {/* Validation Modal */}
+      <Modal 
+        isOpen={isValidationModalOpen} 
+        onClose={() => setValidationModalOpen(false)} 
+        title="Validasi Kedatangan Bahan Baku"
+        className="max-w-3xl"
+      >
+        <div className="space-y-6">
+          <div className="p-4 bg-primary-light border border-primary/20 rounded-2xl">
+            <span className="text-[10px] font-black text-primary uppercase tracking-widest block mb-1">
+              Validasi Pengiriman / Penerimaan
+            </span>
+            <p className="text-slate-500 text-xs font-bold leading-relaxed">
+              Berikut adalah daftar pengajuan restock bahan baku Anda yang sudah di-approve oleh Admin/Koordinator. Silakan checklist bahan baku yang sudah sampai di dapur fisik secara benar untuk ditambahkan ke daftar stok.
+            </p>
+          </div>
+
+          {validationError && (
+            <div className="p-4 bg-red-50 border border-red-150 text-red-650 rounded-2xl text-xs font-bold shadow-sm">
+              {validationError}
+            </div>
+          )}
+
+          {approvedRequests.length === 0 ? (
+            <div className="py-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100 space-y-2">
+              <Package className="w-10 h-10 text-slate-300 mx-auto" />
+              <h5 className="font-extrabold text-slate-800 text-sm">Tidak Ada Bahan Baku Menunggu Validasi</h5>
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                Saat ini belum ada kiriman bahan baku yang di-approve oleh Admin untuk dapur Anda.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
+              {approvedRequests.map((req: any) => {
+                const isSelected = !!selectedRequestIds[req.id];
+                const dateStr = req.createdAt ? new Date(req.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+                
+                return (
+                  <div 
+                    key={req.id} 
+                    onClick={() => {
+                      setSelectedRequestIds(prev => ({
+                        ...prev,
+                        [req.id]: !prev[req.id]
+                      }));
+                    }}
+                    className={cn(
+                      "flex items-center justify-between p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:bg-white hover:border-primary/20 transition-all cursor-pointer select-none",
+                      isSelected && "bg-white border-primary/30 shadow-md shadow-primary/5"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
+                        isSelected ? "bg-primary border-primary text-white" : "border-slate-350 bg-white"
+                      )}>
+                        {isSelected && <Check className="w-4 h-4 stroke-[3]" />}
+                      </div>
+                      <div>
+                        <h5 className="font-black text-slate-800 text-sm tracking-tight">{req.material}</h5>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">Requested: {dateStr}</span>
+                          <span className="w-1 h-1 rounded-full bg-slate-350" />
+                          <span className={cn(
+                            "px-2 py-0.5 text-[8px] font-black rounded-md uppercase tracking-wider",
+                            req.urgency === 'High' ? 'bg-red-50 text-red-650' : req.urgency === 'Medium' ? 'bg-amber-50 text-amber-650' : 'bg-slate-50 text-slate-650'
+                          )}>
+                            {req.urgency}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-base font-black text-primary tracking-tight">{req.amount}</span>
+                      {req.note && (
+                        <p className="text-[10px] text-slate-450 italic font-medium mt-0.5 max-w-[180px] truncate" title={req.note}>
+                          Catatan: {req.note}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {approvedRequests.length > 0 && (
+            <Button 
+              className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2" 
+              onClick={handleValidateArrival}
+              disabled={validatingArrival}
+            >
+              {validatingArrival ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Memproses Validasi...
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="w-4 h-4" />
+                  Validasi & Tambah ke Stok ({Object.keys(selectedRequestIds).filter(id => selectedRequestIds[id]).length} Item)
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </Modal>
     </div>

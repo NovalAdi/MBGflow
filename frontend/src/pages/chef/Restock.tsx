@@ -105,6 +105,7 @@ export const Restock = ({ user }: { user: any }) => {
   const [predicting, setPredicting] = React.useState(false);
   const [predictions, setPredictions] = React.useState<any[]>([]);
   const [aiError, setAiError] = React.useState("");
+  const [alertMessage, setAlertMessage] = React.useState<{ title: string; message: string } | null>(null);
   
   // Manual Batch Form State
   const createEmptyManualItem = (): ManualRequestItem => ({
@@ -459,7 +460,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
       const requests = await api.getStockRequests(user.kitchenId);
       setStockRequests(requests);
     } catch (error: any) {
-      alert(error.message || "Gagal mengajukan restock.");
+      setAlertMessage({ title: "Gagal Mengajukan", message: error.message || "Gagal mengajukan restock." });
     } finally {
       setSubmittingRequest(false);
     }
@@ -497,7 +498,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
       const reqList = await api.getStockRequests(user.kitchenId);
       setStockRequests(reqList);
     } catch (err: any) {
-      alert(err.message || "Gagal mengirimkan pengajuan.");
+      setAlertMessage({ title: "Gagal Mengirimkan", message: err.message || "Gagal mengirimkan pengajuan." });
     } finally {
       setSubmittingRequest(false);
     }
@@ -510,7 +511,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
 
   const populateFromDeficits = () => {
     if (directDeficits.length === 0) {
-      alert("Tidak ada kekurangan bahan baku (defisit) yang terdeteksi untuk rencana produksi aktif.");
+      setAlertMessage({ title: "Tidak Ada Defisit", message: "Tidak ada kekurangan bahan baku (defisit) yang terdeteksi untuk rencana produksi aktif." });
       return;
     }
     const filledItems: ManualRequestItem[] = directDeficits.map(item => {
@@ -564,7 +565,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
     const material = item.materialSelect === "custom" ? item.customMaterial : item.materialSelect;
     const unit = item.unitSelect === "custom" ? item.customUnit : item.unitSelect;
     if (!material || !item.quantity) {
-      alert("Harap lengkapi nama bahan dan jumlah terlebih dahulu!");
+      setAlertMessage({ title: "Lengkapi Formulir", message: "Harap lengkapi nama bahan dan jumlah terlebih dahulu!" });
       return;
     }
     handleCheckAvailability({
@@ -586,7 +587,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
 
     if (invalid) {
       setFormError("Jumlah wajib diisi");
-      alert("Harap isi semua kolom bahan, jumlah, dan satuan!");
+      setAlertMessage({ title: "Lengkapi Formulir", message: "Harap isi semua kolom bahan, jumlah, dan satuan!" });
       return;
     }
 
@@ -625,7 +626,7 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
       const reqList = await api.getStockRequests(user.kitchenId);
       setStockRequests(reqList);
     } catch (err: any) {
-      alert(err.message || "Gagal mengirimkan pengajuan.");
+      setAlertMessage({ title: "Gagal Mengirimkan", message: err.message || "Gagal mengirimkan pengajuan." });
     } finally {
       setSubmittingRequest(false);
     }
@@ -1335,6 +1336,26 @@ Format Output: Harus mengembalikan array JSON murni tanpa markdown, tanpa penjel
         )}
       </AnimatePresence>
 
+      {/* Custom Alert Modal */}
+      <Modal
+        isOpen={alertMessage !== null}
+        onClose={() => setAlertMessage(null)}
+        title={alertMessage?.title || "Notifikasi"}
+      >
+        <div className="space-y-6 py-2">
+          <p className="text-sm font-bold text-slate-600 leading-relaxed">
+            {alertMessage?.message}
+          </p>
+          <div className="pt-2">
+            <Button 
+              className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md"
+              onClick={() => setAlertMessage(null)}
+            >
+              Tutup
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

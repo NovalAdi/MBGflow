@@ -156,6 +156,10 @@ async function updateProductionPlan(req, res) {
       return res.status(404).json({ error: 'Rencana produksi tidak ditemukan.' });
     }
     const current = existing[0];
+    if (current.status !== 'Pending') {
+      connection.release();
+      return res.status(400).json({ error: 'Rencana sedang berjalan dan tidak bisa diubah.' });
+    }
 
     const mergedDay = day !== undefined ? day : current.day;
     const mergedPortions = portions !== undefined ? Number(portions) : current.portions;
@@ -239,6 +243,11 @@ async function deleteProductionPlan(req, res) {
       connection.release();
       return res.status(404).json({ error: 'Rencana produksi tidak ditemukan.' });
     }
+    const current = existing[0];
+    if (current.status !== 'Pending') {
+      connection.release();
+      return res.status(400).json({ error: 'Rencana sedang berjalan dan tidak bisa dihapus.' });
+    }
 
     await connection.query('DELETE FROM production_plans WHERE id = ?', [id]);
     await connection.query('DELETE FROM production_logs WHERE id = ?', [id]);
@@ -257,11 +266,11 @@ async function deleteProductionPlan(req, res) {
 
 async function finishProductionLog(req, res) {
   await delay(100);
-  const { productionId } = req.body;
+  const { productionId, notes } = req.body;
 
   try {
     const endTime = new Date().toISOString();
-    await db.query("UPDATE production_logs SET status = 'Ready', endTime = ? WHERE id = ?", [endTime, productionId]);
+    await db.query("UPDATE production_logs SET status = 'Ready', endTime = ?, qaNotes = ? WHERE id = ?", [endTime, notes || '', productionId]);
     await db.query("UPDATE production_plans SET status = 'Ready' WHERE id = ?", [productionId]);
 
     res.json({ success: true, handoverId: `H-${Date.now()}` });

@@ -544,6 +544,10 @@ async function updateStockRequestStatus(req, res) {
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Stock request not found.' });
     }
+    const requestItem = rows[0];
+    if (requestItem.status !== 'Pending') {
+      return res.status(400).json({ error: 'Permintaan stock sudah diproses sebelumnya.' });
+    }
     
     await db.query(
       'UPDATE stock_requests SET status = ?, note = ? WHERE id = ?',
@@ -557,6 +561,144 @@ async function updateStockRequestStatus(req, res) {
   }
 }
 
+async function validateStockArrival(req, res) {
+  await delay(100);
+  const { requestIds } = req.body;
+  if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+    return res.status(400).json({ error: 'Array requestIds tidak boleh kosong.' });
+  }
+
+  const connection = await db.pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const processedRequests = [];
+
+    for (const requestId of requestIds) {
+      // 1. Get stock request
+      const [requests] = await connection.query(
+        'SELECT * FROM stock_requests WHERE id = ?',
+        [requestId]
+      );
+
+      if (requests.length === 0) {
+        continue;
+      }
+
+      const request = requests[0];
+      if (request.status !== 'Approved') {
+        continue;
+      }
+
+      // Update status to 'Delivered'
+      await connection.query(
+        "UPDATE stock_requests SET status = 'Delivered' WHERE id = ?",
+        [requestId]
+      );
+
+      // 2. Parse amount (e.g. "10 karton")
+      const amountStr = request.amount || '';
+      const match = amountStr.match(/^([\d.]+)\s*(.*)$/);
+      if (!match) continue;
+
+      const quantity = parseFloat(match[1]);
+      const requestedUnit = match[2] ? match[2].trim() : '';
+
+      // 3. Find inventory item matching the material name
+      let [invItems] = await connection.query(
+        'SELECT * FROM inventory WHERE LOWER(name) = ?',
+        [request.material.toLowerCase()]
+      );
+
+      let invItem;
+      if (invItems.length === 0) {
+        // Create a new inventory item if it doesn't exist
+        const newInvId = `mat-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const sku = `SKU-${request.material.toUpperCase().replace(/[^A-Z0-9]/g, '-')}-${Date.now()}`;
+        const baseUnit = ['kg', 'g', 'l', 'ml', 'pcs'].includes(requestedUnit.toLowerCase()) ? requestedUnit : 'kg';
+        
+        await connection.query(
+          'INSERT INTO inventory (id, name, logistics_sku, base_unit, has_packaging, packaging_name, packaging_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [newInvId, request.material, sku, baseUnit, 0, null, null]
+        );
+
+        invItem = {
+          id: newInvId,
+          name: request.material,
+          base_unit: baseUnit,
+          has_packaging: 0,
+          packaging_name: null,
+          packaging_capacity: null
+        };
+      } else {
+        invItem = invItems[0];
+      }
+
+      // 4. Determine batch parameters
+      const batchId = `b-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // default 30 days
+      
+      let container = 'Wadah';
+      let qty_packed = 0;
+      let qty_loose = quantity;
+      let unit = requestedUnit || invItem.base_unit || 'kg';
+      let package_capacity = invItem.packaging_capacity !== null ? Number(invItem.packaging_capacity) : null;
+      let package_unit = invItem.base_unit;
+
+      if (invItem.has_packaging && invItem.packaging_capacity > 0 && invItem.packaging_name) {
+        package_capacity = Number(invItem.packaging_capacity);
+        const pkgName = invItem.packaging_name;
+        
+        if (requestedUnit.toLowerCase() === pkgName.toLowerCase()) {
+          qty_packed = quantity;
+          qty_loose = 0;
+          container = pkgName;
+          unit = requestedUnit.toLowerCase();
+        } else if (requestedUnit.toLowerCase() === invItem.base_unit.toLowerCase()) {
+          qty_packed = Math.floor(quantity / package_capacity);
+          qty_loose = Number((quantity % package_capacity).toFixed(4));
+          container = pkgName;
+          unit = pkgName.toLowerCase();
+        } else {
+          qty_packed = 0;
+          qty_loose = quantity;
+          container = 'Wadah';
+          unit = requestedUnit;
+        }
+      } else {
+        // No packaging
+        container = 'Wadah';
+        qty_packed = 0;
+        qty_loose = quantity;
+        unit = requestedUnit || invItem.base_unit || 'kg';
+      }
+
+      // Calculate weight using the utility formatSingleBatch
+      const weight = formatSingleBatch(qty_packed, qty_loose, container, package_capacity, package_unit);
+
+      // Insert new batch
+      await connection.query(
+        `INSERT INTO inventory_batches 
+         (id, inventoryId, kitchenId, container, weight, qty_packed, qty_loose, unit, package_capacity, package_unit, expiry) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [batchId, invItem.id, request.kitchenId, container, weight, qty_packed, qty_loose, unit, package_capacity, package_unit, expiry]
+      );
+
+      processedRequests.push(requestId);
+    }
+
+    await connection.commit();
+    connection.release();
+
+    res.json({ success: true, processedRequests });
+  } catch (error) {
+    await connection.rollback();
+    connection.release();
+    console.error('Validate stock arrival error:', error);
+    res.status(500).json({ error: 'Server error validating stock arrival.' });
+  }
+}
+
 module.exports = {
   getInventory,
   getStockRequests,
@@ -566,5 +708,6 @@ module.exports = {
   getWastage,
   getChefDashboardData,
   getMaterialAvailability,
-  updateStockRequestStatus
+  updateStockRequestStatus,
+  validateStockArrival
 };

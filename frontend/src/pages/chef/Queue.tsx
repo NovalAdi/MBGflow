@@ -24,9 +24,8 @@ export const ChefQueue = ({ user }: { user: any }) => {
   // Stock Verification States
   const [isVerified, setIsVerified] = React.useState(true);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
-  const [temperature, setTemperature] = React.useState("");
   const [qaError, setQaError] = React.useState<string | null>(null);
-  const [leftoverStock, setLeftoverStock] = React.useState<Record<string, string>>({});
+  const [qaNotes, setQaNotes] = React.useState("");
   const [isVerificationModalOpen, setVerificationModalOpen] = React.useState(false);
   const [verificationData, setVerificationData] = React.useState<{
     lastMenu: string | null;
@@ -37,6 +36,7 @@ export const ChefQueue = ({ user }: { user: any }) => {
   const [detailedInputs, setDetailedInputs] = React.useState<Record<string, { qty_packed: string; qty_loose: string }>>({});
   const [otherInputs, setOtherInputs] = React.useState<Record<string, string>>({});
   const [isVerifying, setIsVerifying] = React.useState(false);
+  const [alertMessage, setAlertMessage] = React.useState<{ title: string; message: string } | null>(null);
 
   const [kitchenStock, setKitchenStock] = React.useState<any[]>([]);
 
@@ -110,8 +110,7 @@ export const ChefQueue = ({ user }: { user: any }) => {
       }
     } else if (task.status === 'Cooking' || task.status === 'Ready') {
       setSelectedTask(task);
-      setTemperature("");
-      setLeftoverStock({});
+      setQaNotes("");
       setQaError(null);
       setQAModalOpen(true);
     }
@@ -183,7 +182,7 @@ export const ChefQueue = ({ user }: { user: any }) => {
       setVerificationModalOpen(false);
       fetchTasks();
     } catch (err: any) {
-      alert(err?.message || "Gagal melakukan verifikasi stok.");
+      setAlertMessage({ title: "Gagal Verifikasi", message: err?.message || "Gagal melakukan verifikasi stok." });
     } finally {
       setIsVerifying(false);
     }
@@ -211,38 +210,19 @@ export const ChefQueue = ({ user }: { user: any }) => {
   };
 
   const submitQA = () => {
-    const tempVal = parseFloat(temperature);
-    if (isNaN(tempVal)) {
-      setQaError("Suhu wajib diisi!");
-      return;
-    }
-    if (tempVal < 60) {
-      setQaError("Suhu makanan kurang panas / di bawah standar keamanan pangan!");
-      return;
-    }
-
-    let hasNegative = false;
-    Object.keys(leftoverStock).forEach(key => {
-      const val = parseFloat(leftoverStock[key]);
-      if (!isNaN(val) && val < 0) {
-        hasNegative = true;
-      }
-    });
-
-    if (hasNegative) {
-      setQaError("Sisa bahan baku tidak boleh bernilai negatif!");
-      return;
-    }
-
     setQaError(null);
 
-    api.finishTask({ productionId: selectedTask?.id }).then(res => {
+    if (!selectedTask) return;
+
+    api.finishTask({ productionId: selectedTask.id, notes: qaNotes }).then(res => {
       // User requested: Cooking -> Ready should not generate QR
       if (selectedTask?.status === 'Ready') {
         setHandoverData({ id: res.handoverId, qr: JSON.stringify({ id: res.handoverId, menu: selectedTask?.menu }) });
       }
       fetchTasks();
       setQAModalOpen(false);
+    }).catch((err: any) => {
+      setQaError(err.message || "Gagal memproses QA & Serah Terima.");
     });
   };
 
@@ -594,7 +574,7 @@ export const ChefQueue = ({ user }: { user: any }) => {
         isOpen={isQAModalOpen} 
         onClose={() => setQAModalOpen(false)} 
         title={`QA & Serah Terima: ${selectedTask?.menu}`}
-        className="max-w-3xl"
+        className="max-w-2xl"
       >
         <div className="space-y-6">
           {qaError && (
@@ -603,63 +583,17 @@ export const ChefQueue = ({ user }: { user: any }) => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
-                <Thermometer className="w-3.5 h-3.5 text-red-500" />
-                Suhu Akhir (°C)
-              </span>
-              <input 
-                type="number" 
-                name="suhu"
-                step="0.1" 
-                className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:bg-white focus:border-primary transition-all" 
-                placeholder="75.0" 
-                value={temperature}
-                onChange={(e) => {
-                  setTemperature(e.target.value);
-                  setQaError(null);
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
-                <MessageSquare className="w-3.5 h-3.5 text-primary" />
-                Catatan Kualitas
-              </span>
-              <textarea className="w-full bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none transition-all h-24 resize-none" placeholder="Tambahkan catatan QC..." />
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-               <h4 className="font-extrabold text-slate-800 text-sm uppercase tracking-wider">Kalkulator Stok Balikan</h4>
-               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Update Real-time</span>
-            </div>
-            <div className="grid grid-cols-1 gap-4">
-              {[
-                { name: 'Ayam Negri', unit: 'kg' },
-                { name: 'Minyak Goreng', unit: 'L' },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between gap-6 p-4 bg-slate-50/50 border border-slate-100 rounded-2xl hover:bg-white hover:border-primary/20 transition-all">
-                  <span className="text-sm font-bold text-slate-700">{item.name}</span>
-                  <div className="flex items-center gap-4">
-                    <input 
-                      type="text" 
-                      name={item.name}
-                      value={leftoverStock[item.name] || ""}
-                      onChange={(e) => {
-                        setLeftoverStock(prev => ({ ...prev, [item.name]: e.target.value }));
-                        setQaError(null);
-                      }}
-                      className="w-28 text-right bg-white border-2 border-slate-100 focus:border-primary rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none transition-all" 
-                      placeholder="Sisa" 
-                    />
-                    <span className="text-xs font-bold text-slate-500 w-6 uppercase">{item.unit}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="space-y-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-1">
+              <MessageSquare className="w-3.5 h-3.5 text-primary" />
+              Catatan Kualitas
+            </span>
+            <textarea 
+              value={qaNotes}
+              onChange={(e) => setQaNotes(e.target.value)}
+              className="w-full bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none transition-all h-32 resize-none" 
+              placeholder="Tambahkan catatan QC..." 
+            />
           </div>
 
           <Button className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs" onClick={submitQA}>
@@ -809,6 +743,27 @@ export const ChefQueue = ({ user }: { user: any }) => {
           >
             {isVerifying ? "Menyimpan Verifikasi..." : "Konfirmasi & Mulai Masak"}
           </Button>
+        </div>
+      </Modal>
+
+      {/* Custom Alert Modal */}
+      <Modal
+        isOpen={alertMessage !== null}
+        onClose={() => setAlertMessage(null)}
+        title={alertMessage?.title || "Notifikasi"}
+      >
+        <div className="space-y-6 py-2">
+          <p className="text-sm font-bold text-slate-600 leading-relaxed">
+            {alertMessage?.message}
+          </p>
+          <div className="pt-2">
+            <Button 
+              className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md"
+              onClick={() => setAlertMessage(null)}
+            >
+              Tutup
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
