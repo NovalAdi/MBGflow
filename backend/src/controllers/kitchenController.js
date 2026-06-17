@@ -129,7 +129,7 @@ async function getKitchenDetail(req, res) {
        FROM production_logs pl
        JOIN menus m ON pl.menuId = m.id
        JOIN kitchens k ON pl.kitchenId = k.id
-       WHERE pl.kitchenId = ?`,
+       WHERE pl.kitchenId = ? AND pl.status != 'Done'`,
       [id]
     );
 

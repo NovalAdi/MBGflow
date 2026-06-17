@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { Badge } from "@/src/components/ui/Badge";
+import { Modal } from "@/src/components/ui/Modal";
 import { 
   ChevronLeft, 
   Search, 
@@ -30,8 +31,9 @@ export const ProductionHistory = () => {
   const [data, setData] = React.useState<ProductionLog[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [sortConfig, setSortConfig] = React.useState<SortConfig>(null);
+  const [sortConfig, setSortConfig] = React.useState<SortConfig>({ key: 'date', direction: 'desc' });
   const [statusFilter, setStatusFilter] = React.useState<string>("All");
+  const [selectedItem, setSelectedItem] = React.useState<ProductionLog | null>(null);
 
   React.useEffect(() => {
     api.getActivity().then((res) => {
@@ -219,7 +221,11 @@ export const ProductionHistory = () => {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredAndSortedData.map((item) => (
-                <tr key={item.id} className="group hover:bg-slate-50/30 transition-colors">
+                <tr 
+                  key={item.id} 
+                  onClick={() => setSelectedItem(item)}
+                  className="group hover:bg-slate-50/30 transition-colors cursor-pointer"
+                >
                   <td className="p-6 align-top">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-slate-50 flex flex-col items-center justify-center border border-slate-100 group-hover:bg-white group-hover:scale-105 transition-all">
@@ -263,7 +269,8 @@ export const ProductionHistory = () => {
                         item.status === 'Live' ? 'Langsung' : 
                         item.status === 'Preparing' ? 'Persiapan' :
                         item.status === 'Cooking' ? 'Masak' :
-                        item.status === 'Ready' ? 'Selesai' :
+                        item.status === 'Ready' ? 'Siap Diantar' :
+                        item.status === 'Done' ? 'Selesai' :
                         item.status
                       } 
                     />
@@ -297,6 +304,105 @@ export const ProductionHistory = () => {
            </div>
         </div>
       </Card>
+
+      {/* Detail Modal */}
+      <Modal
+        isOpen={selectedItem !== null}
+        onClose={() => setSelectedItem(null)}
+        title="Detail Aktivitas Produksi"
+        className="max-w-2xl"
+      >
+        {selectedItem && (
+          <div className="space-y-6 py-2">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-4">
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">MENU / MASAKAN</p>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-1">{selectedItem.menu}</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">ID: #{selectedItem.id.slice(-6).toUpperCase()}</p>
+              </div>
+              <Badge 
+                status={
+                  selectedItem.status === 'NotStarted' ? 'Antrean' : 
+                  selectedItem.status === 'Live' ? 'Langsung' : 
+                  selectedItem.status === 'Preparing' ? 'Persiapan' :
+                  selectedItem.status === 'Cooking' ? 'Masak' :
+                  selectedItem.status === 'Ready' ? 'Siap Diantar' :
+                  selectedItem.status === 'Done' ? 'Selesai' :
+                  selectedItem.status
+                } 
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">DAPUR</p>
+                  <p className="text-sm font-black text-slate-700 mt-1 flex items-center gap-2">
+                    <UtensilsCrossed className="w-4 h-4 text-primary" />
+                    {selectedItem.kitchen} ({selectedItem.city})
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PORSI DIPRODUKSI</p>
+                  <p className="text-sm font-black text-slate-700 mt-1">
+                    {selectedItem.servings} Porsi
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">PENANGGUNG JAWAB</p>
+                  <p className="text-sm font-bold text-slate-700 mt-1 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[8px] font-black text-slate-500 uppercase">
+                      {(selectedItem.chefPenanggungJawab || "CH").split(' ').map(n => n[0]).join('')}
+                    </span>
+                    {selectedItem.chefPenanggungJawab || "Koki Bertugas"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WAKTU MULAI</p>
+                  <p className="text-sm font-bold text-slate-700 mt-1">
+                    {selectedItem.startTime ? format(new Date(selectedItem.startTime), "dd MMMM yyyy, HH:mm") : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WAKTU SELESAI</p>
+                  <p className="text-sm font-bold text-slate-700 mt-1">
+                    {selectedItem.endTime ? format(new Date(selectedItem.endTime), "dd MMMM yyyy, HH:mm") : "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4 space-y-2">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                Catatan Kualitas (QA)
+              </p>
+              <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl min-h-[80px]">
+                {selectedItem.qaNotes ? (
+                  <p className="text-sm text-slate-700 font-bold whitespace-pre-wrap leading-relaxed">
+                    {selectedItem.qaNotes}
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-400 font-medium italic">
+                    Tidak ada catatan QA yang diinput.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <Button 
+                className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-md"
+                onClick={() => setSelectedItem(null)}
+              >
+                Tutup Detail
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

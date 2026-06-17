@@ -41,7 +41,7 @@ async function getLastCookedMenu(req, res) {
       `SELECT pl.*, m.name as menuName
        FROM production_logs pl
        JOIN menus m ON pl.menuId = m.id
-       WHERE pl.kitchenId = ? AND pl.status = 'Ready'
+       WHERE pl.kitchenId = ? AND pl.status IN ('Ready', 'Done')
        ORDER BY pl.startTime DESC LIMIT 1`,
       [kitchenId]
     );

@@ -2,7 +2,7 @@ import * as React from "react";
 import { Card } from "@/src/components/ui/Card";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
-import { api } from "@/src/services/api";
+import { Modal } from "@/src/components/ui/Modal";
 import { 
   CookingPot, 
   TrendingUp, 
@@ -21,7 +21,8 @@ import {
   Truck, 
   Sparkles,
   ArrowRight,
-  Info
+  Info,
+  MessageSquare
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";

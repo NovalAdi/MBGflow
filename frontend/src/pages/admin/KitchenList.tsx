@@ -13,6 +13,7 @@ const INDO_DAYS = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu
 export const KitchenList = () => {
   const [kitchens, setKitchens] = React.useState<Kitchen[]>([]);
   const [plans, setPlans] = React.useState<any[]>([]);
+  const [productionLogs, setProductionLogs] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [currentKitchen, setCurrentKitchen] = React.useState<Partial<Kitchen> | null>(null);
@@ -42,14 +43,16 @@ export const KitchenList = () => {
   const fetchKitchens = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      const [kitchensData, plansData] = await Promise.all([
+      const [kitchensData, plansData, logsData] = await Promise.all([
         api.getKitchens(),
-        api.getProductionPlans()
+        api.getProductionPlans(),
+        api.getActivity()
       ]);
       setKitchens(kitchensData);
       setPlans(plansData || []);
+      setProductionLogs(logsData || []);
     } catch (error) {
-      console.error("Failed to fetch kitchens and plans", error);
+      console.error("Failed to fetch kitchens, plans and logs", error);
     } finally {
       setIsLoading(false);
     }
@@ -299,15 +302,15 @@ export const KitchenList = () => {
                 </div>
               
                 {(() => {
-                  const totalPortionsToday = plans
-                    .filter(p => p.kitchenId === kitchen.id && p.day === todayDayName)
-                    .reduce((sum, p) => sum + (Number(p.portions) || 0), 0);
+                  const totalPortionsToday = productionLogs
+                    .filter(p => p.kitchenId === kitchen.id)
+                    .reduce((sum, p) => sum + (Number(p.servings) || 0), 0);
                   const usedPercentage = Math.min(100, Math.round((totalPortionsToday / kitchen.capacity) * 100));
 
                   return (
                     <div className="pt-2 space-y-4">
                       <div className="flex items-center justify-between px-1">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest font-sans">Utilisasi Hari Ini ({todayDayName})</span>
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest font-sans">Utilisasi Hari Ini</span>
                         <span className="text-[10px] font-black text-primary uppercase tracking-widest font-sans">
                           {totalPortionsToday.toLocaleString()} / {kitchen.capacity.toLocaleString()} ({usedPercentage}%)
                         </span>

@@ -20,6 +20,7 @@ export const Badge = ({ status, className }: BadgeProps) => {
       case 'sedang dimasak':
       case 'langsung': return 'bg-[#2563EB] text-white shadow-md border border-blue-500';
       case 'ready':
+      case 'done':
       case 'selesai':
       case 'success' :
       case 'berhasil':

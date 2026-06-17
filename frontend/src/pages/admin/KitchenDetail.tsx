@@ -1014,12 +1014,6 @@ export const KitchenDetail = () => {
                   })()}
                </div>
             </div>
-
-            <div className="pt-2">
-               <Button className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs">
-                  Kirim Status QC
-               </Button>
-            </div>
           </div>
         )}
       </Modal>

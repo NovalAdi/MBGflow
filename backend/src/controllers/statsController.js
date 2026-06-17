@@ -6,7 +6,7 @@ async function getStats(req, res) {
   await delay(50);
   try {
     const [kitchenCount] = await db.query('SELECT COUNT(*) as count FROM kitchens');
-    const [successfulServings] = await db.query("SELECT SUM(servings) as count FROM production_logs WHERE status = 'Ready'");
+    const [successfulServings] = await db.query("SELECT SUM(servings) as count FROM production_logs WHERE status IN ('Ready', 'Done')");
     const [currentlyCooking] = await db.query("SELECT COUNT(*) as count FROM production_logs WHERE status = 'Cooking'");
     const [totalActivities] = await db.query('SELECT COUNT(*) as count FROM production_logs');
     const [chefsOnDuty] = await db.query("SELECT COUNT(*) as count FROM users WHERE role = 'Chef'");

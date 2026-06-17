@@ -367,7 +367,7 @@ async function getChefDashboardData(req, res) {
     
     for (const plan of todayPlans) {
       totalPortions += plan.servings || 0;
-      if (plan.status === 'Ready') {
+      if (plan.status === 'Ready' || plan.status === 'Done') {
         completedPortions += plan.servings || 0;
       } else if (plan.status === 'Cooking') {
         activeCookingCount++;

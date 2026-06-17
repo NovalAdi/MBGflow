@@ -48,7 +48,7 @@ export const ChefQueue = ({ user }: { user: any }) => {
         api.checkStockVerificationStatus(user?.kitchenId),
         user?.kitchenId ? api.getKitchenDetail(user.kitchenId) : Promise.resolve(null)
       ]);
-      setTasks(tasksData || []);
+      setTasks((tasksData || []).filter((t: any) => t.status !== 'Done'));
       setMenus(menusData || []);
       setIsVerified(verificationStatus.verified);
       setKitchenStock(kitchenData?.stock || []);
@@ -108,11 +108,18 @@ export const ChefQueue = ({ user }: { user: any }) => {
           setErrorMsg(err.message || "Stok kosong atau stok tidak mencukupi untuk bahan baku utama!");
         });
       }
-    } else if (task.status === 'Cooking' || task.status === 'Ready') {
+    } else if (task.status === 'Cooking') {
       setSelectedTask(task);
       setQaNotes("");
       setQaError(null);
       setQAModalOpen(true);
+    } else if (task.status === 'Ready') {
+      api.finishTask({ productionId: task.id }).then(res => {
+        setHandoverData({ id: res.handoverId, qr: JSON.stringify({ id: res.handoverId, menu: task.menu }) });
+        fetchTasks();
+      }).catch((err: any) => {
+        setAlertMessage({ title: "Gagal Serah Terima", message: err.message || "Gagal memproses QR Serah Terima." });
+      });
     }
   };
 
@@ -215,10 +222,6 @@ export const ChefQueue = ({ user }: { user: any }) => {
     if (!selectedTask) return;
 
     api.finishTask({ productionId: selectedTask.id, notes: qaNotes }).then(res => {
-      // User requested: Cooking -> Ready should not generate QR
-      if (selectedTask?.status === 'Ready') {
-        setHandoverData({ id: res.handoverId, qr: JSON.stringify({ id: res.handoverId, menu: selectedTask?.menu }) });
-      }
       fetchTasks();
       setQAModalOpen(false);
     }).catch((err: any) => {
@@ -573,7 +576,7 @@ export const ChefQueue = ({ user }: { user: any }) => {
       <Modal 
         isOpen={isQAModalOpen} 
         onClose={() => setQAModalOpen(false)} 
-        title={`QA & Serah Terima: ${selectedTask?.menu}`}
+        title={`Catatan QA Selesai Masak: ${selectedTask?.menu}`}
         className="max-w-2xl"
       >
         <div className="space-y-6">
@@ -597,7 +600,7 @@ export const ChefQueue = ({ user }: { user: any }) => {
           </div>
 
           <Button className="w-full py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs" onClick={submitQA}>
-            {selectedTask?.status === 'Ready' ? 'Buat ID & QR Serah Terima' : 'Konfirmasi Selesai Masak'}
+            Konfirmasi Selesai Masak
           </Button>
         </div>
       </Modal>

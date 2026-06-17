@@ -270,8 +270,22 @@ async function finishProductionLog(req, res) {
 
   try {
     const endTime = new Date().toISOString();
-    await db.query("UPDATE production_logs SET status = 'Ready', endTime = ?, qaNotes = ? WHERE id = ?", [endTime, notes || '', productionId]);
-    await db.query("UPDATE production_plans SET status = 'Ready' WHERE id = ?", [productionId]);
+    
+    // Check current status first
+    const [existing] = await db.query("SELECT status FROM production_logs WHERE id = ?", [productionId]);
+    const currentStatus = existing[0]?.status;
+
+    let nextStatus = 'Ready';
+    if (currentStatus === 'Ready') {
+      nextStatus = 'Done';
+    }
+
+    if (notes !== undefined && notes !== null) {
+      await db.query("UPDATE production_logs SET status = ?, endTime = ?, qaNotes = ? WHERE id = ?", [nextStatus, endTime, notes, productionId]);
+    } else {
+      await db.query("UPDATE production_logs SET status = ?, endTime = ? WHERE id = ?", [nextStatus, endTime, productionId]);
+    }
+    await db.query("UPDATE production_plans SET status = ? WHERE id = ?", [nextStatus, productionId]);
 
     res.json({ success: true, handoverId: `H-${Date.now()}` });
   } catch (error) {
