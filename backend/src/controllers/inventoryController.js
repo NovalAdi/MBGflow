@@ -2,6 +2,13 @@ const db = require('../config/db');
 const { formatSingleBatch } = require('../utils/formatters');
 const { convertUnit, getDisplayUnit, aggregateStock } = require('../utils/unitConverter');
 
+const formatDate = (val) => {
+  if (!val) return '';
+  if (val instanceof Date) return val.toISOString().split('T')[0];
+  if (typeof val === 'string') return val.split('T')[0];
+  return String(val);
+};
+
 const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function getInventory(req, res) {
@@ -28,7 +35,7 @@ async function getInventory(req, res) {
           weight: formattedWeight,
           package_capacity: cap,
           package_unit: b.package_unit,
-          expiry: b.expiry ? b.expiry.toISOString().split('T')[0] : ''
+          expiry: formatDate(b.expiry)
         };
       });
       return {
@@ -409,7 +416,7 @@ async function getChefDashboardData(req, res) {
           weight: formatSingleBatch(qtyPacked, qtyLoose, b.container, cap, b.package_unit),
           package_capacity: b.package_capacity !== null ? Number(b.package_capacity) : null,
           package_unit: b.package_unit,
-          expiry: b.expiry ? b.expiry.toISOString().split('T')[0] : '',
+          expiry: formatDate(b.expiry),
           isLow,
           isExpiringSoon,
           daysToExpiry: diffDays
@@ -507,7 +514,7 @@ async function getMaterialAvailability(req, res) {
         qty_loose: qtyLoose,
         unit: b.unit,
         weight: formattedWeight,
-        expiry: b.expiry ? b.expiry.toISOString().split('T')[0] : ''
+        expiry: formatDate(b.expiry)
       });
     }
     

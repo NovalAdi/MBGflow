@@ -2,6 +2,13 @@ const db = require('../config/db');
 const { formatSingleBatch } = require('../utils/formatters');
 const { aggregateStock } = require('../utils/unitConverter');
 
+const formatDate = (val) => {
+  if (!val) return '';
+  if (val instanceof Date) return val.toISOString().split('T')[0];
+  if (typeof val === 'string') return val.split('T')[0];
+  return String(val);
+};
+
 const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function getKitchens(req, res) {
@@ -160,7 +167,7 @@ async function getKitchenDetail(req, res) {
           weight: formattedWeight,
           package_capacity: cap,
           package_unit: b.package_unit,
-          expiry: b.expiry ? b.expiry.toISOString().split('T')[0] : ''
+          expiry: formatDate(b.expiry)
         };
       });
 

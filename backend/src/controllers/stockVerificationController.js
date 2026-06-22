@@ -1,6 +1,13 @@
 const db = require('../config/db');
 const { formatSingleBatch } = require('../utils/formatters');
 
+const formatDate = (val) => {
+  if (!val) return '';
+  if (val instanceof Date) return val.toISOString().split('T')[0];
+  if (typeof val === 'string') return val.split('T')[0];
+  return String(val);
+};
+
 const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function checkVerificationStatus(req, res) {
@@ -80,7 +87,7 @@ async function getLastCookedMenu(req, res) {
         unit: b.unit,
         package_capacity: b.package_capacity !== null ? Number(b.package_capacity) : null,
         package_unit: b.package_unit,
-        expiry: b.expiry ? b.expiry.toISOString().split('T')[0] : ''
+        expiry: formatDate(b.expiry)
       };
 
       if (isDetailed) {
