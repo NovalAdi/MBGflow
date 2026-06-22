@@ -27,6 +27,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/src/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { api } from "@/src/services/api";
 
 export const ChefDashboard = ({ user }: { user: any }) => {
   const navigate = useNavigate();
