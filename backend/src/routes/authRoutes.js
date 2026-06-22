@@ -1,14 +1,15 @@
-const express = require('express');
-const router = express.Router();
+const { Hono } = require('hono');
+const router = new Hono();
 const authController = require('../controllers/authController');
 const { protect } = require('../middlewares/authMiddleware');
+const { toExpress, toExpressMiddleware } = require('../utils/expressCompat');
 
 // Public route
-router.post('/login', authController.login);
+router.post('/login', toExpress(authController.login));
 
 // Protected routes
-router.get('/users', protect, authController.getUsers);
-router.put('/users/:id', protect, authController.updateUser);
-router.delete('/users/:id', protect, authController.deleteUser);
+router.get('/users', toExpressMiddleware(protect), toExpress(authController.getUsers));
+router.put('/users/:id', toExpressMiddleware(protect), toExpress(authController.updateUser));
+router.delete('/users/:id', toExpressMiddleware(protect), toExpress(authController.deleteUser));
 
 module.exports = router;

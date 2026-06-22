@@ -1,7 +1,5 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
-
+const { Hono } = require('hono');
+const { cors } = require('hono/cors');
 const db = require('./src/config/db');
 
 // Import routes
@@ -11,24 +9,37 @@ const inventoryRoutes = require('./src/routes/inventoryRoutes');
 const productionRoutes = require('./src/routes/productionRoutes');
 const statsRoutes = require('./src/routes/statsRoutes');
 
-const app = express();
-const PORT = process.env.PORT || 5000;
+const app = new Hono();
 
-app.use(cors());
-app.use(express.json());
+// CORS Middleware
+app.use('*', cors());
+
+let dbInitialized = false;
+
+// Middleware to set database binding and initialize D1 SQLite tables & seeds on demand
+app.use('*', async (c, next) => {
+  db.initDb(c.env.DB);
+  
+  if (!dbInitialized) {
+    try {
+      await db.initializeDatabase();
+      dbInitialized = true;
+    } catch (e) {
+      console.error("Cloudflare D1 database initialization failed:", e);
+    }
+  }
+  
+  await next();
+});
+
+// Default status route
+app.get('/', (c) => c.text('MBGflow Cloudflare Workers Backend is active.'));
 
 // Mount routes
-app.use('/api', authRoutes);
-app.use('/api', inventoryRoutes);
-app.use('/api', productionRoutes);
-app.use('/api', statsRoutes);
-app.use('/api/kitchens', kitchenRoutes); // Kitchens has specific subroutes prefix /api/kitchens
+app.route('/api', authRoutes);
+app.route('/api', inventoryRoutes);
+app.route('/api', productionRoutes);
+app.route('/api', statsRoutes);
+app.route('/api/kitchens', kitchenRoutes);
 
-// Start Express Server
-db.initializeDatabase().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
-}).catch(err => {
-  console.error('Failed to initialize database connection. Server not started:', err);
-});
+export default app;

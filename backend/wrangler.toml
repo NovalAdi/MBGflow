@@ -1,0 +1,9 @@
+name = "mbgflow-backend"
+main = "server.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = [ "nodejs_compat" ]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mbgflow-db"
+database_id = "mbgflow-db-id"

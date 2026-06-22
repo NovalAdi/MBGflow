@@ -46,9 +46,10 @@ async function createKitchen(req, res) {
     );
 
     if (Array.isArray(staffIds) && staffIds.length > 0) {
+      const placeholders = staffIds.map(() => '?').join(',');
       await db.query(
-        'UPDATE users SET kitchenId = ? WHERE id IN (?)',
-        [newKitchen.id, staffIds]
+        `UPDATE users SET kitchenId = ? WHERE id IN (${placeholders})`,
+        [newKitchen.id, ...staffIds]
       );
     }
 
