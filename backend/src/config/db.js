@@ -1,291 +1,252 @@
-const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
-require('dotenv').config();
 
-const dbConfig = {
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
+let currentDb = null;
+
+const initDb = (d1Database) => {
+  currentDb = d1Database;
 };
 
-let pool;
-
-async function initializeDatabase() {
-  let connection;
-  try {
-    // 1. First connection without database name to ensure DB exists
-    connection = await mysql.createConnection(dbConfig);
-    const dbName = process.env.DB_NAME || 'mbgflow';
-    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
-    console.log(`Database '${dbName}' ensured.`);
-  } catch (error) {
-    console.error('Failed to create or verify database:', error.message);
-    throw error;
-  } finally {
-    if (connection) await connection.end();
+const query = async (sql, params = []) => {
+  if (!currentDb) {
+    throw new Error("Database connection not initialized. Check if initDb was called.");
   }
 
-  // 2. Create the connection pool with database name
-  pool = mysql.createPool({
-    ...dbConfig,
-    database: process.env.DB_NAME || 'mbgflow',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
+  // Normalize parameters to an array
+  const formattedParams = Array.isArray(params) ? params : (params !== undefined ? [params] : []);
 
-  // 3. Drop all tables for a clean reset
-  await resetDatabase();
+  // Check if it's a select query
+  const isSelect = sql.trim().toLowerCase().startsWith('select');
 
-  // 4. Create tables
-  await createTables();
-
-  // 5. Seed tables with comprehensive demo data
-  await seedDatabase();
-}
-
-async function resetDatabase() {
-  const connection = await pool.getConnection();
   try {
-    await connection.query('SET FOREIGN_KEY_CHECKS = 0;');
-    const tables = [
-      'notifications',
-      'stock_verifications',
-      'wastage_records',
-      'stock_requests',
-      'production_logs',
-      'production_plans',
-      'ingredients',
-      'inventory_batches',
-      'inventory',
-      'users',
-      'menus',
-      'kitchens'
-    ];
-    for (const table of tables) {
-      await connection.query(`DROP TABLE IF EXISTS \`${table}\`;`);
+    if (isSelect) {
+      const res = await currentDb.prepare(sql).bind(...formattedParams).all();
+      return [res.results || [], null];
+    } else {
+      const res = await currentDb.prepare(sql).bind(...formattedParams).run();
+      return [res, null];
     }
-    // Also drop legacy 'staff' table if it exists
-    await connection.query('DROP TABLE IF EXISTS `staff`;');
-    await connection.query('SET FOREIGN_KEY_CHECKS = 1;');
-    console.log('All tables dropped successfully (clean reset).');
   } catch (error) {
-    console.error('Error resetting database:', error);
+    console.error("Database query execution error:", error, "SQL:", sql, "Params:", formattedParams);
     throw error;
-  } finally {
-    connection.release();
+  }
+};
+
+async function initializeDatabase() {
+  if (!currentDb) return;
+
+  try {
+    // 1. Create tables if they do not exist
+    await createTables();
+
+    // 2. Check if database is already seeded (by checking users count)
+    const { results } = await currentDb.prepare('SELECT COUNT(*) as count FROM users').all();
+    const count = results[0]?.count || 0;
+
+    if (count === 0) {
+      console.log('Database is empty. Seeding comprehensive demo data...');
+      await seedDatabase();
+    } else {
+      console.log('Database already initialized. Skipping seeding.');
+    }
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    throw error;
   }
 }
 
 async function createTables() {
-  const connection = await pool.getConnection();
-  try {
-    // Kitchens table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS kitchens (
-        id VARCHAR(50) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        address TEXT,
-        capacity INT,
-        city VARCHAR(100),
-        latitude DECIMAL(10, 8) NULL,
-        longitude DECIMAL(11, 8) NULL,
-        maps_url TEXT NULL
-      );
-    `);
+  // SQLite doesn't require foreign key checks to be disabled for table creation, 
+  // but we enforce standard CREATE TABLE scripts.
+  
+  // Kitchens table
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS kitchens (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      address TEXT,
+      capacity INTEGER,
+      city TEXT,
+      latitude REAL NULL,
+      longitude REAL NULL,
+      maps_url TEXT NULL
+    );
+  `).run();
 
-    // Menus table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS menus (
-        id VARCHAR(50) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL UNIQUE
-      );
-    `);
+  // Menus table
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS menus (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE
+    );
+  `).run();
 
-    // Ingredients table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS ingredients (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        menuId VARCHAR(50) NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        perPortion DECIMAL(10, 4) NOT NULL,
-        unit VARCHAR(20) NOT NULL,
-        FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE CASCADE
-      );
-    `);
+  // Ingredients table
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS ingredients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      menuId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      perPortion REAL NOT NULL,
+      unit TEXT NOT NULL,
+      FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE CASCADE
+    );
+  `).run();
 
-    // Inventory items (materials) table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS inventory (
-        id VARCHAR(50) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL UNIQUE,
-        logistics_sku VARCHAR(100) NULL,
-        base_unit VARCHAR(20) NOT NULL DEFAULT 'kg',
-        has_packaging TINYINT(1) DEFAULT 0,
-        packaging_name VARCHAR(50) NULL,
-        packaging_capacity DECIMAL(10, 4) NULL
-      );
-    `);
+  // Inventory items
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS inventory (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      logistics_sku TEXT NULL,
+      base_unit TEXT NOT NULL DEFAULT 'kg',
+      has_packaging INTEGER DEFAULT 0,
+      packaging_name TEXT NULL,
+      packaging_capacity REAL NULL
+    );
+  `).run();
 
-    // Inventory batches table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS inventory_batches (
-        id VARCHAR(50) PRIMARY KEY,
-        inventoryId VARCHAR(50) NOT NULL,
-        kitchenId VARCHAR(50) NOT NULL,
-        container VARCHAR(255),
-        weight VARCHAR(50) NOT NULL,
-        qty_packed INT NOT NULL DEFAULT 0,
-        qty_loose DECIMAL(10, 4) NOT NULL DEFAULT 0.0000,
-        unit VARCHAR(50) NOT NULL DEFAULT 'kg',
-        package_capacity DECIMAL(10, 4) NULL,
-        package_unit VARCHAR(50) NULL,
-        expiry DATE NOT NULL,
-        FOREIGN KEY (inventoryId) REFERENCES inventory(id) ON DELETE CASCADE,
-        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE
-      );
-    `);
+  // Inventory batches
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS inventory_batches (
+      id TEXT PRIMARY KEY,
+      inventoryId TEXT NOT NULL,
+      kitchenId TEXT NOT NULL,
+      container TEXT,
+      weight TEXT NOT NULL,
+      qty_packed INTEGER NOT NULL DEFAULT 0,
+      qty_loose REAL NOT NULL DEFAULT 0.0000,
+      unit TEXT NOT NULL DEFAULT 'kg',
+      package_capacity REAL NULL,
+      package_unit TEXT NULL,
+      expiry TEXT NOT NULL,
+      FOREIGN KEY (inventoryId) REFERENCES inventory(id) ON DELETE CASCADE,
+      FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE
+    );
+  `).run();
 
-    // Users table (formerly 'staff')
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id VARCHAR(50) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        role VARCHAR(50) NOT NULL,
-        status VARCHAR(50) NOT NULL DEFAULT 'Active',
-        avatar VARCHAR(255),
-        kitchenId VARCHAR(50),
-        email VARCHAR(255) NOT NULL UNIQUE,
-        password VARCHAR(255) NOT NULL DEFAULT 'password',
-        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE SET NULL
-      );
-    `);
+  // Users table
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Active',
+      avatar TEXT,
+      kitchenId TEXT,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL DEFAULT 'password',
+      FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE SET NULL
+    );
+  `).run();
 
-    // Production plans table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS production_plans (
-        id VARCHAR(50) PRIMARY KEY,
-        day VARCHAR(20) NOT NULL,
-        menuId VARCHAR(50) NOT NULL,
-        kitchenId VARCHAR(50) NOT NULL,
-        portions INT NOT NULL,
-        note TEXT,
-        status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-        userId VARCHAR(50),
-        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE,
-        FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE CASCADE,
-        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
-      );
-    `);
+  // Production plans
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS production_plans (
+      id TEXT PRIMARY KEY,
+      day TEXT NOT NULL,
+      menuId TEXT NOT NULL,
+      kitchenId TEXT NOT NULL,
+      portions INTEGER NOT NULL,
+      note TEXT,
+      status TEXT NOT NULL DEFAULT 'Pending',
+      userId TEXT,
+      FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE,
+      FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE CASCADE,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
+    );
+  `).run();
 
-    // Production logs table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS production_logs (
-        id VARCHAR(50) PRIMARY KEY,
-        kitchenId VARCHAR(50),
-        menuId VARCHAR(50) NOT NULL,
-        servings INT NOT NULL,
-        startTime VARCHAR(100),
-        endTime VARCHAR(100),
-        qaNotes TEXT,
-        status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE SET NULL,
-        FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE CASCADE
-      );
-    `);
+  // Production logs
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS production_logs (
+      id TEXT PRIMARY KEY,
+      kitchenId TEXT,
+      menuId TEXT NOT NULL,
+      servings INTEGER NOT NULL,
+      startTime TEXT,
+      endTime TEXT,
+      qaNotes TEXT,
+      status TEXT NOT NULL DEFAULT 'Pending',
+      FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE SET NULL,
+      FOREIGN KEY (menuId) REFERENCES menus(id) ON DELETE CASCADE
+    );
+  `).run();
 
-    // Stock requests table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS stock_requests (
-        id VARCHAR(50) PRIMARY KEY,
-        material VARCHAR(255) NOT NULL,
-        amount VARCHAR(50) NOT NULL,
-        urgency VARCHAR(50) NOT NULL,
-        status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-        createdAt VARCHAR(100) NOT NULL,
-        kitchenId VARCHAR(50) NULL,
-        supplierKitchenId VARCHAR(50) NULL,
-        note TEXT NULL,
-        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE SET NULL,
-        FOREIGN KEY (supplierKitchenId) REFERENCES kitchens(id) ON DELETE SET NULL
-      );
-    `);
+  // Stock requests
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS stock_requests (
+      id TEXT PRIMARY KEY,
+      material TEXT NOT NULL,
+      amount TEXT NOT NULL,
+      urgency TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'Pending',
+      createdAt TEXT NOT NULL,
+      kitchenId TEXT NULL,
+      supplierKitchenId TEXT NULL,
+      note TEXT NULL,
+      FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE SET NULL,
+      FOREIGN KEY (supplierKitchenId) REFERENCES kitchens(id) ON DELETE SET NULL
+    );
+  `).run();
 
-    // Wastage records table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS wastage_records (
-        id VARCHAR(50) PRIMARY KEY,
-        kitchenId VARCHAR(50) NOT NULL,
-        inventoryId VARCHAR(50) NOT NULL,
-        weight DECIMAL(10,2) NOT NULL,
-        unit VARCHAR(20) NOT NULL DEFAULT 'kg',
-        reason VARCHAR(255) NOT NULL,
-        cost INT NOT NULL,
-        date VARCHAR(50) NOT NULL,
-        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE,
-        FOREIGN KEY (inventoryId) REFERENCES inventory(id) ON DELETE CASCADE
-      );
-    `);
+  // Wastage records
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS wastage_records (
+      id TEXT PRIMARY KEY,
+      kitchenId TEXT NOT NULL,
+      inventoryId TEXT NOT NULL,
+      weight REAL NOT NULL,
+      unit TEXT NOT NULL DEFAULT 'kg',
+      reason TEXT NOT NULL,
+      cost INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE,
+      FOREIGN KEY (inventoryId) REFERENCES inventory(id) ON DELETE CASCADE
+    );
+  `).run();
 
-    // Notifications table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS notifications (
-        id VARCHAR(50) PRIMARY KEY,
-        kitchenId VARCHAR(50) NOT NULL,
-        message TEXT NOT NULL,
-        isRead TINYINT(1) DEFAULT 0,
-        createdAt VARCHAR(100) NOT NULL,
-        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE
-      );
-    `);
+  // Notifications
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      kitchenId TEXT NOT NULL,
+      message TEXT NOT NULL,
+      isRead INTEGER DEFAULT 0,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE
+    );
+  `).run();
 
-    // Stock verifications table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS stock_verifications (
-        id VARCHAR(50) PRIMARY KEY,
-        kitchenId VARCHAR(50) NOT NULL,
-        verifiedAt VARCHAR(100) NOT NULL,
-        verifiedBy VARCHAR(255) NOT NULL,
-        details TEXT NOT NULL,
-        FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE
-      );
-    `);
+  // Stock verifications
+  await currentDb.prepare(`
+    CREATE TABLE IF NOT EXISTS stock_verifications (
+      id TEXT PRIMARY KEY,
+      kitchenId TEXT NOT NULL,
+      verifiedAt TEXT NOT NULL,
+      verifiedBy TEXT NOT NULL,
+      details TEXT NOT NULL,
+      FOREIGN KEY (kitchenId) REFERENCES kitchens(id) ON DELETE CASCADE
+    );
+  `).run();
 
-    console.log('Database tables created successfully.');
-  } catch (error) {
-    console.error('Error creating database tables:', error);
-    throw error;
-  } finally {
-    connection.release();
-  }
+  console.log('SQLite tables initialized successfully.');
 }
 
 async function seedDatabase() {
-  const connection = await pool.getConnection();
   try {
-    console.log('Seeding database with comprehensive demo data...');
-    await connection.query('SET FOREIGN_KEY_CHECKS = 0;');
-
-    // =========================================================================
-    // 1. KITCHENS
-    // =========================================================================
+    // 1. Kitchens
     const kitchens = [
       { id: 'k1', name: 'Dapur Pusat Jakarta', address: 'Grogol, Jakarta Barat', capacity: 5000, city: 'Jakarta', latitude: -6.1668, longitude: 106.7865, maps_url: 'https://www.google.com/maps/place/Grogol,+West+Jakarta+City,+Jakarta/@-6.1668,106.7865,15z' },
       { id: 'k2', name: 'Dapur Satelit Tangerang', address: 'BSD, Tangerang Selatan', capacity: 2500, city: 'Tangerang', latitude: -6.3024, longitude: 106.6522, maps_url: 'https://www.google.com/maps/place/BSD+City/@-6.3024,106.6522,15z' },
       { id: 'k3', name: 'Production Hub Bandung', address: 'Dago, Bandung', capacity: 3000, city: 'Bandung', latitude: -6.8915, longitude: 107.6106, maps_url: 'https://www.google.com/maps/place/Dago,+Bandung+City,+West+Java/@-6.8915,107.6106,15z' },
     ];
     for (const k of kitchens) {
-      await connection.query(
-        'INSERT INTO kitchens (id, name, address, capacity, city, latitude, longitude, maps_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [k.id, k.name, k.address, k.capacity, k.city, k.latitude, k.longitude, k.maps_url]
-      );
+      await currentDb.prepare(
+        'INSERT INTO kitchens (id, name, address, capacity, city, latitude, longitude, maps_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(k.id, k.name, k.address, k.capacity, k.city, k.latitude, k.longitude, k.maps_url).run();
     }
-    console.log(`  ✓ ${kitchens.length} kitchens seeded`);
 
-    // =========================================================================
-    // 2. MENUS & INGREDIENTS
-    // =========================================================================
+    // 2. Menus & Ingredients
     const menus = [
       {
         id: 'menu-1', name: 'Ayam Goreng Gurih',
@@ -337,22 +298,15 @@ async function seedDatabase() {
       },
     ];
     for (const menu of menus) {
-      await connection.query(
-        'INSERT INTO menus (id, name) VALUES (?, ?)',
-        [menu.id, menu.name]
-      );
+      await currentDb.prepare('INSERT INTO menus (id, name) VALUES (?, ?)').bind(menu.id, menu.name).run();
       for (const ing of menu.ingredients) {
-        await connection.query(
-          'INSERT INTO ingredients (menuId, name, perPortion, unit) VALUES (?, ?, ?, ?)',
-          [menu.id, ing.name, ing.perPortion, ing.unit]
-        );
+        await currentDb.prepare(
+          'INSERT INTO ingredients (menuId, name, perPortion, unit) VALUES (?, ?, ?, ?)'
+        ).bind(menu.id, ing.name, ing.perPortion, ing.unit).run();
       }
     }
-    console.log(`  ✓ ${menus.length} menus with ingredients seeded`);
 
-    // =========================================================================
-    // 3. INVENTORY & INVENTORY BATCHES
-    // =========================================================================
+    // 3. Inventory & Batches
     const inventory = [
       {
         id: 'mat-1', name: 'Ayam Negri', logistics_sku: 'SKU-AYM-01', base_unit: 'kg', has_packaging: 1, packaging_name: 'Karton', packaging_capacity: 25,
@@ -430,25 +384,18 @@ async function seedDatabase() {
         ],
       },
     ];
-    let batchCount = 0;
     for (const item of inventory) {
-      await connection.query(
-        'INSERT INTO inventory (id, name, logistics_sku, base_unit, has_packaging, packaging_name, packaging_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [item.id, item.name, item.logistics_sku, item.base_unit, item.has_packaging, item.packaging_name, item.packaging_capacity]
-      );
+      await currentDb.prepare(
+        'INSERT INTO inventory (id, name, logistics_sku, base_unit, has_packaging, packaging_name, packaging_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).bind(item.id, item.name, item.logistics_sku, item.base_unit, item.has_packaging, item.packaging_name, item.packaging_capacity).run();
       for (const batch of item.batches) {
-        await connection.query(
-          'INSERT INTO inventory_batches (id, inventoryId, kitchenId, container, weight, qty_packed, qty_loose, unit, expiry, package_capacity, package_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [batch.id, item.id, batch.kitchenId, batch.container, batch.weight, batch.qty_packed, batch.qty_loose, batch.unit, batch.expiry, batch.package_capacity, batch.package_unit]
-        );
-        batchCount++;
+        await currentDb.prepare(
+          'INSERT INTO inventory_batches (id, inventoryId, kitchenId, container, weight, qty_packed, qty_loose, unit, expiry, package_capacity, package_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(batch.id, item.id, batch.kitchenId, batch.container, batch.weight, batch.qty_packed, batch.qty_loose, batch.unit, batch.expiry, batch.package_capacity, batch.package_unit).run();
       }
     }
-    console.log(`  ✓ ${inventory.length} inventory items with ${batchCount} batches seeded`);
 
-    // =========================================================================
-    // 4. USERS (formerly 'staff', with bcrypt password hashing)
-    // =========================================================================
+    // 4. Users
     const usersList = [
       { id: 's1', name: 'Noval Admin', role: 'Admin', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=noval', kitchenId: 'k1', email: 'novaladiperasetya@gmail.com', password: 'password' },
       { id: 's2', name: 'Andi Jakarta', role: 'Chef', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=andi', kitchenId: 'k1', email: 'chef.jakarta@mbg.com', password: 'password' },
@@ -471,16 +418,12 @@ async function seedDatabase() {
     ];
     for (const user of usersList) {
       const hashedPassword = await bcrypt.hash(user.password, 10);
-      await connection.query(
-        'INSERT INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [user.id, user.name, user.role, user.status, user.avatar, user.kitchenId, user.email, hashedPassword]
-      );
+      await currentDb.prepare(
+        'INSERT INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(user.id, user.name, user.role, user.status, user.avatar, user.kitchenId, user.email, hashedPassword).run();
     }
-    console.log(`  ✓ ${usersList.length} users seeded (passwords hashed)`);
 
-    // =========================================================================
-    // 5. PRODUCTION PLANS & PRODUCTION LOGS
-    // =========================================================================
+    // 5. Production Plans & Logs
     const productionPlans = [
       { id: 'plan-1', day: 'Senin', menuId: 'menu-1', kitchenId: 'k1', portions: 400, note: 'Gunakan Batch b1', status: 'Ready', userId: 's2' },
       { id: 'plan-2', day: 'Senin', menuId: 'menu-3', kitchenId: 'k2', portions: 200, note: 'Gunakan batch b9', status: 'Cooking', userId: 's3' },
@@ -494,12 +437,10 @@ async function seedDatabase() {
       { id: 'plan-10', day: 'Jumat', menuId: 'menu-2', kitchenId: 'k2', portions: 220, note: '', status: 'Pending', userId: 's3' },
     ];
     for (const plan of productionPlans) {
-      await connection.query(
-        'INSERT INTO production_plans (id, day, menuId, kitchenId, portions, note, status, userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [plan.id, plan.day, plan.menuId, plan.kitchenId, plan.portions, plan.note, plan.status, plan.userId]
-      );
+      await currentDb.prepare(
+        'INSERT INTO production_plans (id, day, menuId, kitchenId, portions, note, status, userId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(plan.id, plan.day, plan.menuId, plan.kitchenId, plan.portions, plan.note, plan.status, plan.userId).run();
 
-      // Create matching production log
       const logStatus = plan.status === 'NotStarted' ? 'Pending' : plan.status;
       let startTime = null;
       let endTime = null;
@@ -507,19 +448,15 @@ async function seedDatabase() {
         startTime = new Date().toISOString();
       } else if (plan.status === 'Ready') {
         startTime = new Date(Date.now() - 86400000).toISOString();
-        endTime = new Date(Date.now() - 82800000).toISOString(); // ~1 hour after start
+        endTime = new Date(Date.now() - 82800000).toISOString();
       }
 
-      await connection.query(
-        'INSERT INTO production_logs (id, kitchenId, menuId, servings, startTime, endTime, qaNotes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [plan.id, plan.kitchenId, plan.menuId, plan.portions, startTime, endTime, plan.note, logStatus]
-      );
+      await currentDb.prepare(
+        'INSERT INTO production_logs (id, kitchenId, menuId, servings, startTime, endTime, qaNotes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(plan.id, plan.kitchenId, plan.menuId, plan.portions, startTime, endTime, plan.note, logStatus).run();
     }
-    console.log(`  ✓ ${productionPlans.length} production plans & logs seeded`);
 
-    // =========================================================================
-    // 6. STOCK REQUESTS
-    // =========================================================================
+    // 6. Stock Requests
     const now = new Date();
     const stockRequests = [
       { id: 'sr-1', material: 'Ayam Negri', amount: '10 karton', urgency: 'High', status: 'Approved', createdAt: new Date(now - 86400000 * 5).toISOString(), kitchenId: 'k1', supplierKitchenId: null, note: 'Disetujui, kirim besok pagi' },
@@ -532,16 +469,12 @@ async function seedDatabase() {
       { id: 'sr-8', material: 'Sambal Kecap', amount: '1 box', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 1).toISOString(), kitchenId: 'k2', supplierKitchenId: null, note: null },
     ];
     for (const sr of stockRequests) {
-      await connection.query(
-        'INSERT INTO stock_requests (id, material, amount, urgency, status, createdAt, kitchenId, supplierKitchenId, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [sr.id, sr.material, sr.amount, sr.urgency, sr.status, sr.createdAt, sr.kitchenId, sr.supplierKitchenId, sr.note]
-      );
+      await currentDb.prepare(
+        'INSERT INTO stock_requests (id, material, amount, urgency, status, createdAt, kitchenId, supplierKitchenId, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(sr.id, sr.material, sr.amount, sr.urgency, sr.status, sr.createdAt, sr.kitchenId, sr.supplierKitchenId, sr.note).run();
     }
-    console.log(`  ✓ ${stockRequests.length} stock requests seeded`);
 
-    // =========================================================================
-    // 7. WASTAGE RECORDS
-    // =========================================================================
+    // 7. Wastage Records
     const wastageRecords = [
       { id: 'W-1001', kitchenId: 'k1', inventoryId: 'mat-1', weight: 2.5, unit: 'kg', reason: 'Kadaluarsa', cost: 87500, date: '2025-06-01' },
       { id: 'W-1002', kitchenId: 'k1', inventoryId: 'mat-2', weight: 1.0, unit: 'L', reason: 'Tumpah', cost: 35000, date: '2025-06-02' },
@@ -555,32 +488,24 @@ async function seedDatabase() {
       { id: 'W-1010', kitchenId: 'k1', inventoryId: 'mat-1', weight: 1.8, unit: 'kg', reason: 'Sisa Produksi', cost: 63000, date: '2025-06-06' },
     ];
     for (const w of wastageRecords) {
-      await connection.query(
-        'INSERT INTO wastage_records (id, kitchenId, inventoryId, weight, unit, reason, cost, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [w.id, w.kitchenId, w.inventoryId, w.weight, w.unit, w.reason, w.cost, w.date]
-      );
+      await currentDb.prepare(
+        'INSERT INTO wastage_records (id, kitchenId, inventoryId, weight, unit, reason, cost, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(w.id, w.kitchenId, w.inventoryId, w.weight, w.unit, w.reason, w.cost, w.date).run();
     }
-    console.log(`  ✓ ${wastageRecords.length} wastage records seeded`);
 
-    // =========================================================================
-    // 8. NOTIFICATIONS
-    // =========================================================================
+    // 8. Notifications
     const notifications = [
       { id: 'ntf-1', kitchenId: 'k1', message: 'Dapur Pusat Jakarta memiliki sisa stok Ayam Negri yang kritis. Harap perhatikan!', isRead: 0, createdAt: new Date().toISOString() },
       { id: 'ntf-2', kitchenId: 'k2', message: 'Peringatan: Rencana produksi Ikan Gurame Bakar (150 porsi) pada hari Selasa kekurangan bahan: Ikan Gurame (kurang 40.0 kg).', isRead: 0, createdAt: new Date().toISOString() },
       { id: 'ntf-3', kitchenId: 'k3', message: 'Peringatan: Rencana produksi Bebek Goreng Spesial (350 porsi) pada hari Rabu kekurangan bahan: Daging Bebek (kurang 105.0 kg).', isRead: 0, createdAt: new Date().toISOString() }
     ];
     for (const n of notifications) {
-      await connection.query(
-        'INSERT INTO notifications (id, kitchenId, message, isRead, createdAt) VALUES (?, ?, ?, ?, ?)',
-        [n.id, n.kitchenId, n.message, n.isRead, n.createdAt]
-      );
+      await currentDb.prepare(
+        'INSERT INTO notifications (id, kitchenId, message, isRead, createdAt) VALUES (?, ?, ?, ?, ?)'
+      ).bind(n.id, n.kitchenId, n.message, n.isRead, n.createdAt).run();
     }
-    console.log(`  ✓ ${notifications.length} notifications seeded`);
 
-    // =========================================================================
-    // 9. STOCK VERIFICATIONS
-    // =========================================================================
+    // 9. Stock Verifications
     const stockVerifications = [
       {
         id: 'v-1001',
@@ -606,7 +531,7 @@ async function seedDatabase() {
       {
         id: 'v-1003',
         kitchenId: 'k2',
-        verifiedAt: new Date().toISOString(), // Verified today
+        verifiedAt: new Date().toISOString(),
         verifiedBy: 'Chef Budi Tangerang',
         details: JSON.stringify([
           { batchId: 'b2a', qty_packed: 7, qty_loose: 5.0 },
@@ -615,26 +540,20 @@ async function seedDatabase() {
       }
     ];
     for (const sv of stockVerifications) {
-      await connection.query(
-        'INSERT INTO stock_verifications (id, kitchenId, verifiedAt, verifiedBy, details) VALUES (?, ?, ?, ?, ?)',
-        [sv.id, sv.kitchenId, sv.verifiedAt, sv.verifiedBy, sv.details]
-      );
+      await currentDb.prepare(
+        'INSERT INTO stock_verifications (id, kitchenId, verifiedAt, verifiedBy, details) VALUES (?, ?, ?, ?, ?)'
+      ).bind(sv.id, sv.kitchenId, sv.verifiedAt, sv.verifiedBy, sv.details).run();
     }
-    console.log(`  ✓ ${stockVerifications.length} stock verifications seeded`);
 
-    // =========================================================================
-    await connection.query('SET FOREIGN_KEY_CHECKS = 1;');
-    console.log('Database seeded successfully with comprehensive demo data!');
+    console.log('SQLite database seeded successfully.');
   } catch (error) {
-    console.error('Error seeding database:', error);
+    console.error('Error seeding SQLite database:', error);
     throw error;
-  } finally {
-    connection.release();
   }
 }
 
 module.exports = {
-  initializeDatabase,
-  query: (sql, params) => pool.query(sql, params),
-  get pool() { return pool; }
+  initDb,
+  query,
+  initializeDatabase
 };

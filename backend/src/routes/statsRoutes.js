@@ -1,8 +1,9 @@
-const express = require('express');
-const router = express.Router();
+const { Hono } = require('hono');
+const router = new Hono();
 const statsController = require('../controllers/statsController');
 const { protect } = require('../middlewares/authMiddleware');
+const { toExpress, toExpressMiddleware } = require('../utils/expressCompat');
 
-router.get('/stats', protect, statsController.getStats);
+router.get('/stats', toExpressMiddleware(protect), toExpress(statsController.getStats));
 
 module.exports = router;
