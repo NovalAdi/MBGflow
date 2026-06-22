@@ -444,7 +444,7 @@ export const ChefDashboard = ({ user }: { user: any }) => {
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                              Mulai: {new Date(item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              Mulai: {item.startTime ? new Date(item.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-"}
                             </span>
                             <span className="text-slate-200">•</span>
                             <span className={cn(
