@@ -552,8 +552,21 @@ async function seedDatabase() {
   }
 }
 
+const mockConnection = {
+  beginTransaction: async () => {},
+  commit: async () => {},
+  rollback: async () => {},
+  release: () => {},
+  query: (sql, params) => query(sql, params),
+};
+
+const mockPool = {
+  getConnection: async () => mockConnection,
+};
+
 module.exports = {
   initDb,
   query,
-  initializeDatabase
+  initializeDatabase,
+  pool: mockPool
 };
