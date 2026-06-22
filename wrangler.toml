@@ -6,4 +6,4 @@ compatibility_flags = [ "nodejs_compat" ]
 [[d1_databases]]
 binding = "DB"
 database_name = "mbgflow-db"
-database_id = "mbgflow-db-id"
+database_id = "1394e0b3-5300-4e3c-b9ed-d082d75276bc"
