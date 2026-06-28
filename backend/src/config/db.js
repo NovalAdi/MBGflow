@@ -46,15 +46,8 @@ async function initializeDatabase() {
       console.log('Database is empty. Seeding comprehensive demo data...');
       await seedDatabase();
     } else {
-      console.log('Database already initialized. Checking for missing driver accounts...');
-      const { results: driverResults } = await currentDb.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'Driver'").all();
-      const driverCount = driverResults[0]?.count || 0;
-      if (driverCount === 0) {
-        console.log('Driver accounts are missing. Seeding drivers...');
-        await seedDriversOnly();
-      } else {
-        console.log('Driver accounts already exist. Skipping driver seeding.');
-      }
+      console.log('Database already initialized. Syncing/updating driver accounts...');
+      await seedDriversOnly();
     }
   } catch (error) {
     console.error('Failed to initialize database:', error);
@@ -573,10 +566,10 @@ async function seedDriversOnly() {
     for (const user of drivers) {
       const hashedPassword = await bcrypt.hash(user.password, 10);
       await currentDb.prepare(
-        'INSERT INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT OR REPLACE INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       ).bind(user.id, user.name, user.role, user.status, user.avatar, user.kitchenId, user.email, hashedPassword).run();
     }
-    console.log('Driver accounts seeded successfully.');
+    console.log('Driver accounts synced successfully.');
   } catch (error) {
     console.error('Error seeding driver accounts:', error);
     throw error;
