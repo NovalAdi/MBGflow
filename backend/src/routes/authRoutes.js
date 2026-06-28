@@ -6,6 +6,7 @@ const { toExpress, toExpressMiddleware } = require('../utils/expressCompat');
 
 // Public route
 router.post('/login', toExpress(authController.login));
+router.get('/drivers', toExpress(authController.getDrivers));
 
 // Protected routes
 router.get('/users', toExpressMiddleware(protect), toExpress(authController.getUsers));

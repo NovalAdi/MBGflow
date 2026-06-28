@@ -34,7 +34,7 @@ async function login(req, res) {
 
     const allowedRoles = ['Admin', 'Chef', 'Head Chef'];
     if (!allowedRoles.includes(user.role)) {
-      return res.status(403).json({ error: 'Akses ditolak. Staf dapur dan Perwakilan sekolah tidak diizinkan mengakses website ini.' });
+      return res.status(403).json({ error: 'Akses ditolak. Anda tidak memiliki akses ke aplikasi ini.' });
     }
 
     // Generate JWT token
@@ -131,9 +131,27 @@ async function deleteUser(req, res) {
   }
 }
 
+async function getDrivers(req, res) {
+  await delay(50);
+  try {
+    const [rows] = await db.query(`
+      SELECT u.id, u.name, u.role, u.status, u.avatar, u.email, u.kitchenId,
+             k.name as kitchenName, k.city as kitchenCity, k.address as kitchenAddress
+      FROM users u
+      LEFT JOIN kitchens k ON u.kitchenId = k.id
+      WHERE u.role = 'Driver'
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Drivers list error:', error);
+    res.status(500).json({ error: 'Server error fetching drivers.' });
+  }
+}
+
 module.exports = {
   login,
   getUsers,
   updateUser,
-  deleteUser
+  deleteUser,
+  getDrivers
 };

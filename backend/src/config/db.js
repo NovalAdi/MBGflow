@@ -415,6 +415,9 @@ async function seedDatabase() {
       { id: 's_test_admin', name: 'Admin Test', role: 'Admin', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_admin', kitchenId: null, email: 'admin.test@mbg.com', password: 'password' },
       { id: 's_test_chef', name: 'Head Chef Test', role: 'Head Chef', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_chef', kitchenId: null, email: 'chef.test@mbg.com', password: 'password' },
       { id: 's_test_staff', name: 'Staff Test', role: 'Staff', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_staff', kitchenId: null, email: 'staff.test@mbg.com', password: 'password' },
+      { id: 'd_k1_1', name: 'Driver Jakarta', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta', kitchenId: 'k1', email: 'driver.jakarta@mbg.com', password: 'password' },
+      { id: 'd_k2_1', name: 'Driver Tangerang', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang', kitchenId: 'k2', email: 'driver.tangerang@mbg.com', password: 'password' },
+      { id: 'd_k3_1', name: 'Driver Bandung', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung', kitchenId: 'k3', email: 'driver.bandung@mbg.com', password: 'password' },
     ];
     for (const user of usersList) {
       const hashedPassword = await bcrypt.hash(user.password, 10);
