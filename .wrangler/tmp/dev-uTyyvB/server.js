@@ -13,14 +13,14 @@ var __publicField = (obj, key, value) => {
   return value;
 };
 
-// .wrangler/tmp/bundle-HsxXNt/strip-cf-connecting-ip-header.js
+// .wrangler/tmp/bundle-1CWbaD/strip-cf-connecting-ip-header.js
 function stripCfConnectingIPHeader(input, init) {
   const request = new Request(input, init);
   request.headers.delete("CF-Connecting-IP");
   return request;
 }
 var init_strip_cf_connecting_ip_header = __esm({
-  ".wrangler/tmp/bundle-HsxXNt/strip-cf-connecting-ip-header.js"() {
+  ".wrangler/tmp/bundle-1CWbaD/strip-cf-connecting-ip-header.js"() {
     __name(stripCfConnectingIPHeader, "stripCfConnectingIPHeader");
     globalThis.fetch = new Proxy(globalThis.fetch, {
       apply(target, thisArg, argArray) {
@@ -6658,7 +6658,15 @@ var require_db = __commonJS({
           console.log("Database is empty. Seeding comprehensive demo data...");
           await seedDatabase();
         } else {
-          console.log("Database already initialized. Skipping seeding.");
+          console.log("Database already initialized. Checking for missing driver accounts...");
+          const { results: driverResults } = await currentDb.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'Driver'").all();
+          const driverCount = driverResults[0]?.count || 0;
+          if (driverCount === 0) {
+            console.log("Driver accounts are missing. Seeding drivers...");
+            await seedDriversOnly();
+          } else {
+            console.log("Driver accounts already exist. Skipping driver seeding.");
+          }
         }
       } catch (error3) {
         console.error("Failed to initialize database:", error3);
@@ -7064,7 +7072,10 @@ var require_db = __commonJS({
           { id: "s_k3_3", name: "Dewi Lestari", role: "Staff", status: "Active", avatar: "https://i.pravatar.cc/150?u=dewi", kitchenId: "k3", email: "dewi.lestari@mbg.com", password: "password" },
           { id: "s_test_admin", name: "Admin Test", role: "Admin", status: "Active", avatar: "https://i.pravatar.cc/150?u=s_test_admin", kitchenId: null, email: "admin.test@mbg.com", password: "password" },
           { id: "s_test_chef", name: "Head Chef Test", role: "Head Chef", status: "Active", avatar: "https://i.pravatar.cc/150?u=s_test_chef", kitchenId: null, email: "chef.test@mbg.com", password: "password" },
-          { id: "s_test_staff", name: "Staff Test", role: "Staff", status: "Active", avatar: "https://i.pravatar.cc/150?u=s_test_staff", kitchenId: null, email: "staff.test@mbg.com", password: "password" }
+          { id: "s_test_staff", name: "Staff Test", role: "Staff", status: "Active", avatar: "https://i.pravatar.cc/150?u=s_test_staff", kitchenId: null, email: "staff.test@mbg.com", password: "password" },
+          { id: "d_k1_1", name: "Driver Jakarta", role: "Driver", status: "Active", avatar: "https://i.pravatar.cc/150?u=driver_jakarta", kitchenId: "k1", email: "driver.jakarta@mbg.com", password: "password" },
+          { id: "d_k2_1", name: "Driver Tangerang", role: "Driver", status: "Active", avatar: "https://i.pravatar.cc/150?u=driver_tangerang", kitchenId: "k2", email: "driver.tangerang@mbg.com", password: "password" },
+          { id: "d_k3_1", name: "Driver Bandung", role: "Driver", status: "Active", avatar: "https://i.pravatar.cc/150?u=driver_bandung", kitchenId: "k3", email: "driver.bandung@mbg.com", password: "password" }
         ];
         for (const user of usersList) {
           const hashedPassword = await bcrypt.hash(user.password, 10);
@@ -7189,6 +7200,26 @@ var require_db = __commonJS({
       }
     }
     __name(seedDatabase, "seedDatabase");
+    async function seedDriversOnly() {
+      try {
+        const drivers = [
+          { id: "d_k1_1", name: "Driver Jakarta", role: "Driver", status: "Active", avatar: "https://i.pravatar.cc/150?u=driver_jakarta", kitchenId: "k1", email: "driver.jakarta@mbg.com", password: "password" },
+          { id: "d_k2_1", name: "Driver Tangerang", role: "Driver", status: "Active", avatar: "https://i.pravatar.cc/150?u=driver_tangerang", kitchenId: "k2", email: "driver.tangerang@mbg.com", password: "password" },
+          { id: "d_k3_1", name: "Driver Bandung", role: "Driver", status: "Active", avatar: "https://i.pravatar.cc/150?u=driver_bandung", kitchenId: "k3", email: "driver.bandung@mbg.com", password: "password" }
+        ];
+        for (const user of drivers) {
+          const hashedPassword = await bcrypt.hash(user.password, 10);
+          await currentDb.prepare(
+            "INSERT INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+          ).bind(user.id, user.name, user.role, user.status, user.avatar, user.kitchenId, user.email, hashedPassword).run();
+        }
+        console.log("Driver accounts seeded successfully.");
+      } catch (error3) {
+        console.error("Error seeding driver accounts:", error3);
+        throw error3;
+      }
+    }
+    __name(seedDriversOnly, "seedDriversOnly");
     var mockConnection = {
       beginTransaction: async () => {
       },
@@ -11897,7 +11928,7 @@ var require_authController = __commonJS({
         }
         const allowedRoles = ["Admin", "Chef", "Head Chef"];
         if (!allowedRoles.includes(user.role)) {
-          return res.status(403).json({ error: "Akses ditolak. Staf dapur dan Perwakilan sekolah tidak diizinkan mengakses website ini." });
+          return res.status(403).json({ error: "Akses ditolak. Anda tidak memiliki akses ke aplikasi ini." });
         }
         const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
           expiresIn: "30d"
@@ -11979,11 +12010,29 @@ var require_authController = __commonJS({
       }
     }
     __name(deleteUser, "deleteUser");
+    async function getDrivers(req, res) {
+      await delay(50);
+      try {
+        const [rows] = await db2.query(`
+      SELECT u.id, u.name, u.role, u.status, u.avatar, u.email, u.kitchenId,
+             k.name as kitchenName, k.city as kitchenCity, k.address as kitchenAddress
+      FROM users u
+      LEFT JOIN kitchens k ON u.kitchenId = k.id
+      WHERE u.role = 'Driver'
+    `);
+        res.json(rows);
+      } catch (error3) {
+        console.error("Drivers list error:", error3);
+        res.status(500).json({ error: "Server error fetching drivers." });
+      }
+    }
+    __name(getDrivers, "getDrivers");
     module.exports = {
       login,
       getUsers,
       updateUser,
-      deleteUser
+      deleteUser,
+      getDrivers
     };
   }
 });
@@ -12124,6 +12173,7 @@ var require_authRoutes = __commonJS({
     var { protect } = require_authMiddleware();
     var { toExpress, toExpressMiddleware } = require_expressCompat();
     router.post("/login", toExpress(authController.login));
+    router.get("/drivers", toExpress(authController.getDrivers));
     router.get("/users", toExpressMiddleware(protect), toExpress(authController.getUsers));
     router.put("/users/:id", toExpressMiddleware(protect), toExpress(authController.updateUser));
     router.delete("/users/:id", toExpressMiddleware(protect), toExpress(authController.deleteUser));
@@ -14185,14 +14235,14 @@ var require_statsRoutes = __commonJS({
   }
 });
 
-// .wrangler/tmp/bundle-HsxXNt/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-1CWbaD/middleware-loader.entry.ts
 init_strip_cf_connecting_ip_header();
 init_modules_watch_stub();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_console();
 init_performance2();
 
-// .wrangler/tmp/bundle-HsxXNt/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-1CWbaD/middleware-insertion-facade.js
 init_strip_cf_connecting_ip_header();
 init_modules_watch_stub();
 init_virtual_unenv_global_polyfill_cloudflare_unenv_preset_node_process();
@@ -14287,7 +14337,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env2, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// .wrangler/tmp/bundle-HsxXNt/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-1CWbaD/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -14324,7 +14374,7 @@ function __facade_invoke__(request, env2, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-HsxXNt/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-1CWbaD/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
