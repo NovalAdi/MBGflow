@@ -148,10 +148,62 @@ async function getDrivers(req, res) {
   }
 }
 
+async function driverLogin(req, res) {
+  await delay(150);
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email dan password wajib diisi.' });
+  }
+
+  try {
+    const [rows] = await db.query('SELECT * FROM users WHERE LOWER(email) = ?', [email.toLowerCase()]);
+    if (rows.length === 0) {
+      return res.status(401).json({ error: 'Kredensial tidak valid: email tidak terdaftar.' });
+    }
+
+    const user = rows[0];
+
+    // Check if role is Driver
+    if (user.role !== 'Driver') {
+      return res.status(403).json({ error: 'Akses ditolak. Akun ini bukan merupakan akun Driver.' });
+    }
+    
+    // Compare hashed password or plain text password
+    let isMatch = false;
+    if (user.password.startsWith('$2')) {
+      isMatch = await bcrypt.compare(password, user.password);
+    } else {
+      isMatch = (user.password === password);
+    }
+
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Kata sandi salah. Silakan coba lagi.' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, {
+      expiresIn: '30d',
+    });
+
+    // Don't send password back
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+      success: true,
+      token,
+      user: userWithoutPassword
+    });
+  } catch (error) {
+    console.error('Driver login error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan pada server.' });
+  }
+}
+
 module.exports = {
   login,
   getUsers,
   updateUser,
   deleteUser,
-  getDrivers
+  getDrivers,
+  driverLogin
 };
