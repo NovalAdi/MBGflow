@@ -46,7 +46,15 @@ async function initializeDatabase() {
       console.log('Database is empty. Seeding comprehensive demo data...');
       await seedDatabase();
     } else {
-      console.log('Database already initialized. Skipping seeding.');
+      console.log('Database already initialized. Checking for missing driver accounts...');
+      const { results: driverResults } = await currentDb.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'Driver'").all();
+      const driverCount = driverResults[0]?.count || 0;
+      if (driverCount === 0) {
+        console.log('Driver accounts are missing. Seeding drivers...');
+        await seedDriversOnly();
+      } else {
+        console.log('Driver accounts already exist. Skipping driver seeding.');
+      }
     }
   } catch (error) {
     console.error('Failed to initialize database:', error);
@@ -551,6 +559,26 @@ async function seedDatabase() {
     console.log('SQLite database seeded successfully.');
   } catch (error) {
     console.error('Error seeding SQLite database:', error);
+    throw error;
+  }
+}
+
+async function seedDriversOnly() {
+  try {
+    const drivers = [
+      { id: 'd_k1_1', name: 'Driver Jakarta', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta', kitchenId: 'k1', email: 'driver.jakarta@mbg.com', password: 'password' },
+      { id: 'd_k2_1', name: 'Driver Tangerang', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang', kitchenId: 'k2', email: 'driver.tangerang@mbg.com', password: 'password' },
+      { id: 'd_k3_1', name: 'Driver Bandung', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung', kitchenId: 'k3', email: 'driver.bandung@mbg.com', password: 'password' }
+    ];
+    for (const user of drivers) {
+      const hashedPassword = await bcrypt.hash(user.password, 10);
+      await currentDb.prepare(
+        'INSERT INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(user.id, user.name, user.role, user.status, user.avatar, user.kitchenId, user.email, hashedPassword).run();
+    }
+    console.log('Driver accounts seeded successfully.');
+  } catch (error) {
+    console.error('Error seeding driver accounts:', error);
     throw error;
   }
 }
