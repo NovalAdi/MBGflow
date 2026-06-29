@@ -36,10 +36,10 @@ app.use('*', async (c, next) => {
 app.get('/', (c) => c.text('MBGflow Cloudflare Workers Backend is active.'));
 
 // Mount routes
+app.route('/api/kitchens', kitchenRoutes);
 app.route('/api', authRoutes);
 app.route('/api', inventoryRoutes);
 app.route('/api', productionRoutes);
 app.route('/api', statsRoutes);
-app.route('/api/kitchens', kitchenRoutes);
 
 export default app;
