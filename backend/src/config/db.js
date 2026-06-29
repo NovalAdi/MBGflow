@@ -1,5 +1,8 @@
 const bcrypt = require('bcryptjs');
 
+const CURRENT_DB_VERSION = 'v_1782775941631';
+const HASHED_PASSWORD = '$2b$10$H9RHEX92U7vEOEwXgnTFX.j25r1HvNqstHeqlqBVqqXfBcACjv55e';
+
 let currentDb = null;
 
 const initDb = (d1Database) => {
@@ -35,16 +38,67 @@ async function initializeDatabase() {
   if (!currentDb) return;
 
   try {
-    // 1. Create tables if they do not exist
+    // 1. Create metadata table if it does not exist
+    await currentDb.prepare(`
+      CREATE TABLE IF NOT EXISTS db_metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+    `).run();
+
+    // 2. Fetch last seeded version
+    let lastVersion = null;
+    try {
+      const { results } = await currentDb.prepare("SELECT value FROM db_metadata WHERE key = 'db_version'").all();
+      lastVersion = results[0]?.value || null;
+    } catch (_) {}
+
+    // 3. Drop all tables if version has changed
+    if (lastVersion !== CURRENT_DB_VERSION) {
+      console.log(`[SEED] DB version mismatch (last: ${lastVersion}, current: ${CURRENT_DB_VERSION}). Re-seeding remote/local DB...`);
+      const tables = [
+        'stock_verifications', 'notifications', 'wastage_records', 
+        'stock_requests', 'production_logs', 'production_plans', 
+        'users', 'inventory_batches', 'inventory', 'ingredients', 
+        'menus', 'kitchens', 'db_metadata'
+      ];
+      for (const table of tables) {
+        await currentDb.prepare(`DROP TABLE IF EXISTS ${table}`).run();
+      }
+
+      // Re-create tables
+      await createTables();
+
+      // Re-create metadata table
+      await currentDb.prepare(`
+        CREATE TABLE IF NOT EXISTS db_metadata (
+          key TEXT PRIMARY KEY,
+          value TEXT
+        );
+      `).run();
+
+      // Seed database
+      await seedDatabase();
+
+      // Record version
+      await currentDb.prepare("INSERT OR REPLACE INTO db_metadata (key, value) VALUES ('db_version', ?)")
+        .bind(CURRENT_DB_VERSION).run();
+
+      console.log(`[SEED] Database successfully re-seeded to version: ${CURRENT_DB_VERSION}`);
+      return;
+    }
+
+    // 4. Fallback: normal tables creation and seeding if empty
     await createTables();
 
-    // 2. Check if database is already seeded (by checking users count)
     const { results } = await currentDb.prepare('SELECT COUNT(*) as count FROM users').all();
     const count = results[0]?.count || 0;
 
     if (count === 0) {
       console.log('Database is empty. Seeding comprehensive demo data...');
       await seedDatabase();
+      await currentDb.prepare("INSERT OR REPLACE INTO db_metadata (key, value) VALUES ('db_version', ?)")
+        .bind(CURRENT_DB_VERSION).run();
     } else {
       console.log('Database already initialized. Syncing/updating driver accounts...');
       await seedDriversOnly();
@@ -457,7 +511,7 @@ async function seedDatabase() {
       { id: 'd_k4_5', name: 'Lukman Sardi', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok5', kitchenId: 'k4', email: 'driver.depok5@mbg.com', password: 'password' },
     ];
     for (const user of usersList) {
-      const hashedPassword = await bcrypt.hash(user.password, 10);
+      const hashedPassword = HASHED_PASSWORD;
       await currentDb.prepare(
         'INSERT INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       ).bind(user.id, user.name, user.role, user.status, user.avatar, user.kitchenId, user.email, hashedPassword).run();
@@ -631,7 +685,7 @@ async function seedDriversOnly() {
       { id: 'd_k4_5', name: 'Lukman Sardi', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok5', kitchenId: 'k4', email: 'driver.depok5@mbg.com', password: 'password' }
     ];
     for (const user of drivers) {
-      const hashedPassword = await bcrypt.hash(user.password, 10);
+      const hashedPassword = HASHED_PASSWORD;
       await currentDb.prepare(
         'INSERT OR REPLACE INTO users (id, name, role, status, avatar, kitchenId, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       ).bind(user.id, user.name, user.role, user.status, user.avatar, user.kitchenId, user.email, hashedPassword).run();
