@@ -240,6 +240,7 @@ async function seedDatabase() {
       { id: 'k1', name: 'Dapur Pusat Jakarta', address: 'Grogol, Jakarta Barat', capacity: 5000, city: 'Jakarta', latitude: -6.1668, longitude: 106.7865, maps_url: 'https://www.google.com/maps/place/Grogol,+West+Jakarta+City,+Jakarta/@-6.1668,106.7865,15z' },
       { id: 'k2', name: 'Dapur Satelit Tangerang', address: 'BSD, Tangerang Selatan', capacity: 2500, city: 'Tangerang', latitude: -6.3024, longitude: 106.6522, maps_url: 'https://www.google.com/maps/place/BSD+City/@-6.3024,106.6522,15z' },
       { id: 'k3', name: 'Production Hub Bandung', address: 'Dago, Bandung', capacity: 3000, city: 'Bandung', latitude: -6.8915, longitude: 107.6106, maps_url: 'https://www.google.com/maps/place/Dago,+Bandung+City,+West+Java/@-6.8915,107.6106,15z' },
+      { id: 'k4', name: 'Dapur Satelit Depok', address: 'Margonda, Depok', capacity: 2000, city: 'Depok', latitude: -6.3731, longitude: 106.8330, maps_url: 'https://www.google.com/maps/place/Margonda,+Depok/@-6.3731,106.8330,15z' },
     ];
     for (const k of kitchens) {
       await currentDb.prepare(
@@ -315,6 +316,7 @@ async function seedDatabase() {
           { id: 'b1', kitchenId: 'k1', container: 'Karton', qty_packed: 6, qty_loose: 0.0, unit: 'karton', weight: '6 karton', expiry: '2025-08-10', package_capacity: 25, package_unit: 'kg' },
           { id: 'b2a', kitchenId: 'k2', container: 'Karton', qty_packed: 8, qty_loose: 0.0, unit: 'karton', weight: '8 karton', expiry: '2025-08-15', package_capacity: 25, package_unit: 'kg' },
           { id: 'b2b', kitchenId: 'k3', container: 'Karton', qty_packed: 5, qty_loose: 0.0, unit: 'karton', weight: '5 karton', expiry: '2025-07-20', package_capacity: 25, package_unit: 'kg' },
+          { id: 'b_depok_1', kitchenId: 'k4', container: 'Karton', qty_packed: 4, qty_loose: 0.0, unit: 'karton', weight: '4 karton', expiry: '2025-08-12', package_capacity: 25, package_unit: 'kg' },
         ],
       },
       {
@@ -323,6 +325,7 @@ async function seedDatabase() {
           { id: 'b3', kitchenId: 'k1', container: 'Jerigen', qty_packed: 5, qty_loose: 0.0, unit: 'jerigen', weight: '5 jerigen', expiry: '2025-12-10', package_capacity: 20, package_unit: 'L' },
           { id: 'b4', kitchenId: 'k2', container: 'Jerigen', qty_packed: 4, qty_loose: 0.0, unit: 'jerigen', weight: '4 jerigen', expiry: '2025-12-15', package_capacity: 20, package_unit: 'L' },
           { id: 'b5', kitchenId: 'k3', container: 'Jerigen', qty_packed: 6, qty_loose: 0.0, unit: 'jerigen', weight: '6 jerigen', expiry: '2025-12-20', package_capacity: 20, package_unit: 'L' },
+          { id: 'b_depok_2', kitchenId: 'k4', container: 'Jerigen', qty_packed: 3, qty_loose: 0.0, unit: 'jerigen', weight: '3 jerigen', expiry: '2025-12-11', package_capacity: 20, package_unit: 'L' },
         ],
       },
       {
@@ -330,6 +333,7 @@ async function seedDatabase() {
         batches: [
           { id: 'b6', kitchenId: 'k1', container: 'Box', qty_packed: 4, qty_loose: 0.0, unit: 'box', weight: '4 box', expiry: '2025-07-01', package_capacity: 10, package_unit: 'kg' },
           { id: 'b6a', kitchenId: 'k3', container: 'Box', qty_packed: 2, qty_loose: 0.0, unit: 'box', weight: '2 box', expiry: '2025-07-10', package_capacity: 10, package_unit: 'kg' },
+          { id: 'b_depok_3', kitchenId: 'k4', container: 'Box', qty_packed: 2, qty_loose: 0.0, unit: 'box', weight: '2 box', expiry: '2025-07-15', package_capacity: 10, package_unit: 'kg' },
         ],
       },
       {
@@ -338,6 +342,7 @@ async function seedDatabase() {
           { id: 'b7', kitchenId: 'k1', container: 'Jerigen', qty_packed: 3, qty_loose: 0.0, unit: 'jerigen', weight: '3 jerigen', expiry: '2026-01-01', package_capacity: 5, package_unit: 'L' },
           { id: 'b7_refill', kitchenId: 'k1', container: 'Kemasan Refill', qty_packed: 10, qty_loose: 0.0, unit: 'kemasan refill', weight: '10 kemasan refill', expiry: '2026-01-05', package_capacity: 1, package_unit: 'L' },
           { id: 'b8', kitchenId: 'k2', container: 'Jerigen', qty_packed: 2, qty_loose: 0.0, unit: 'jerigen', weight: '2 jerigen', expiry: '2025-11-20', package_capacity: 20, package_unit: 'L' },
+          { id: 'b_depok_4', kitchenId: 'k4', container: 'Jerigen', qty_packed: 2, qty_loose: 0.0, unit: 'jerigen', weight: '2 jerigen', expiry: '2026-02-01', package_capacity: 5, package_unit: 'L' },
         ],
       },
       {
@@ -416,9 +421,40 @@ async function seedDatabase() {
       { id: 's_test_admin', name: 'Admin Test', role: 'Admin', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_admin', kitchenId: null, email: 'admin.test@mbg.com', password: 'password' },
       { id: 's_test_chef', name: 'Head Chef Test', role: 'Head Chef', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_chef', kitchenId: null, email: 'chef.test@mbg.com', password: 'password' },
       { id: 's_test_staff', name: 'Staff Test', role: 'Staff', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=s_test_staff', kitchenId: null, email: 'staff.test@mbg.com', password: 'password' },
-      { id: 'd_k1_1', name: 'Budi Santoso', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta', kitchenId: 'k1', email: 'driver.jakarta@mbg.com', password: 'password' },
-      { id: 'd_k2_1', name: 'Ahmad Hidayat', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang', kitchenId: 'k2', email: 'driver.tangerang@mbg.com', password: 'password' },
-      { id: 'd_k3_1', name: 'Cecep Rahman', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung', kitchenId: 'k3', email: 'driver.bandung@mbg.com', password: 'password' },
+
+      // Depok Staff (k4)
+      { id: 's_depok_admin', name: 'Dimas Admin Depok', role: 'Admin', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=dimas_depok', kitchenId: 'k4', email: 'admin.depok@mbg.com', password: 'password' },
+      { id: 's_depok_chef', name: 'Chef Eko Depok', role: 'Head Chef', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=eko_depok', kitchenId: 'k4', email: 'chef.depok@mbg.com', password: 'password' },
+      { id: 's_depok_staff1', name: 'Rudi Depok', role: 'Staff', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=rudi_depok', kitchenId: 'k4', email: 'rudi.depok@mbg.com', password: 'password' },
+      { id: 's_depok_staff2', name: 'Dewi Depok', role: 'Staff', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=dewi_depok', kitchenId: 'k4', email: 'dewi.depok@mbg.com', password: 'password' },
+
+      // Jakarta Drivers (k1)
+      { id: 'd_k1_1', name: 'Budi Santoso', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta1', kitchenId: 'k1', email: 'driver.jakarta@mbg.com', password: 'password' },
+      { id: 'd_k1_2', name: 'Joko Widodo', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta2', kitchenId: 'k1', email: 'driver.jakarta2@mbg.com', password: 'password' },
+      { id: 'd_k1_3', name: 'Prabowo Subianto', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta3', kitchenId: 'k1', email: 'driver.jakarta3@mbg.com', password: 'password' },
+      { id: 'd_k1_4', name: 'Ganjar Pranowo', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta4', kitchenId: 'k1', email: 'driver.jakarta4@mbg.com', password: 'password' },
+      { id: 'd_k1_5', name: 'Anies Baswedan', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta5', kitchenId: 'k1', email: 'driver.jakarta5@mbg.com', password: 'password' },
+
+      // Tangerang Drivers (k2)
+      { id: 'd_k2_1', name: 'Ahmad Hidayat', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang1', kitchenId: 'k2', email: 'driver.tangerang@mbg.com', password: 'password' },
+      { id: 'd_k2_2', name: 'Rudi Hermawan', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang2', kitchenId: 'k2', email: 'driver.tangerang2@mbg.com', password: 'password' },
+      { id: 'd_k2_3', name: 'Deni Wijaya', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang3', kitchenId: 'k2', email: 'driver.tangerang3@mbg.com', password: 'password' },
+      { id: 'd_k2_4', name: 'Yusuf Mansur', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang4', kitchenId: 'k2', email: 'driver.tangerang4@mbg.com', password: 'password' },
+      { id: 'd_k2_5', name: 'Ali Imron', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang5', kitchenId: 'k2', email: 'driver.tangerang5@mbg.com', password: 'password' },
+
+      // Bandung Drivers (k3)
+      { id: 'd_k3_1', name: 'Cecep Rahman', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung1', kitchenId: 'k3', email: 'driver.bandung@mbg.com', password: 'password' },
+      { id: 'd_k3_2', name: 'Dadang Subur', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung2', kitchenId: 'k3', email: 'driver.bandung2@mbg.com', password: 'password' },
+      { id: 'd_k3_3', name: 'Eka Ramdani', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung3', kitchenId: 'k3', email: 'driver.bandung3@mbg.com', password: 'password' },
+      { id: 'd_k3_4', name: 'Firman Utina', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung4', kitchenId: 'k3', email: 'driver.bandung4@mbg.com', password: 'password' },
+      { id: 'd_k3_5', name: 'Gani Nurcahyo', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung5', kitchenId: 'k3', email: 'driver.bandung5@mbg.com', password: 'password' },
+
+      // Depok Drivers (k4)
+      { id: 'd_k4_1', name: 'Hendra Saputra', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok1', kitchenId: 'k4', email: 'driver.depok@mbg.com', password: 'password' },
+      { id: 'd_k4_2', name: 'Indra Herlambang', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok2', kitchenId: 'k4', email: 'driver.depok2@mbg.com', password: 'password' },
+      { id: 'd_k4_3', name: 'Jaya Suprana', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok3', kitchenId: 'k4', email: 'driver.depok3@mbg.com', password: 'password' },
+      { id: 'd_k4_4', name: 'Kemal Pahlevi', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok4', kitchenId: 'k4', email: 'driver.depok4@mbg.com', password: 'password' },
+      { id: 'd_k4_5', name: 'Lukman Sardi', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok5', kitchenId: 'k4', email: 'driver.depok5@mbg.com', password: 'password' },
     ];
     for (const user of usersList) {
       const hashedPassword = await bcrypt.hash(user.password, 10);
@@ -439,6 +475,9 @@ async function seedDatabase() {
       { id: 'plan-8', day: 'Kamis', menuId: 'menu-5', kitchenId: 'k1', portions: 180, note: '', status: 'Pending', userId: 's6' },
       { id: 'plan-9', day: 'Jumat', menuId: 'menu-3', kitchenId: 'k3', portions: 300, note: 'Batch b9a', status: 'Pending', userId: 's4' },
       { id: 'plan-10', day: 'Jumat', menuId: 'menu-2', kitchenId: 'k2', portions: 220, note: '', status: 'Pending', userId: 's3' },
+      { id: 'plan-depok-1', day: 'Senin', menuId: 'menu-1', kitchenId: 'k4', portions: 250, note: 'Porsi perdana', status: 'Ready', userId: 's_depok_chef' },
+      { id: 'plan-depok-2', day: 'Selasa', menuId: 'menu-2', kitchenId: 'k4', portions: 300, note: 'Porsi biasa', status: 'Cooking', userId: 's_depok_chef' },
+      { id: 'plan-depok-3', day: 'Rabu', menuId: 'menu-3', kitchenId: 'k4', portions: 200, note: 'Porsi ikan', status: 'Pending', userId: 's_depok_chef' },
     ];
     for (const plan of productionPlans) {
       await currentDb.prepare(
@@ -471,6 +510,8 @@ async function seedDatabase() {
       { id: 'sr-6', material: 'Kecap Manis', amount: '4 jerigen', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 1).toISOString(), kitchenId: 'k1', supplierKitchenId: null, note: null },
       { id: 'sr-7', material: 'Bumbu Bebek', amount: '2 box', urgency: 'Low', status: 'Approved', createdAt: new Date(now - 86400000 * 6).toISOString(), kitchenId: 'k3', supplierKitchenId: 'k1', note: 'Kirim dari Jakarta' },
       { id: 'sr-8', material: 'Sambal Kecap', amount: '1 box', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 1).toISOString(), kitchenId: 'k2', supplierKitchenId: null, note: null },
+      { id: 'sr-depok-1', material: 'Ayam Negri', amount: '5 karton', urgency: 'Medium', status: 'Pending', createdAt: new Date(now - 86400000 * 1).toISOString(), kitchenId: 'k4', supplierKitchenId: null, note: null },
+      { id: 'sr-depok-2', material: 'Bumbu Kuning', amount: '2 box', urgency: 'High', status: 'Approved', createdAt: new Date(now - 86400000 * 2).toISOString(), kitchenId: 'k4', supplierKitchenId: 'k1', note: 'Kirim segera dari Jakarta' },
     ];
     for (const sr of stockRequests) {
       await currentDb.prepare(
@@ -490,6 +531,8 @@ async function seedDatabase() {
       { id: 'W-1008', kitchenId: 'k2', inventoryId: 'mat-4', weight: 1.5, unit: 'L', reason: 'Tumpah', cost: 52500, date: '2025-06-05' },
       { id: 'W-1009', kitchenId: 'k3', inventoryId: 'mat-10', weight: 0.5, unit: 'L', reason: 'Kadaluarsa', cost: 17500, date: '2025-06-03' },
       { id: 'W-1010', kitchenId: 'k1', inventoryId: 'mat-1', weight: 1.8, unit: 'kg', reason: 'Sisa Produksi', cost: 63000, date: '2025-06-06' },
+      { id: 'W-depok-1', kitchenId: 'k4', inventoryId: 'mat-1', weight: 1.2, unit: 'kg', reason: 'Tumpah', cost: 42000, date: '2025-06-08' },
+      { id: 'W-depok-2', kitchenId: 'k4', inventoryId: 'mat-2', weight: 0.8, unit: 'L', reason: 'Bocor', cost: 28000, date: '2025-06-09' },
     ];
     for (const w of wastageRecords) {
       await currentDb.prepare(
@@ -559,9 +602,33 @@ async function seedDatabase() {
 async function seedDriversOnly() {
   try {
     const drivers = [
-      { id: 'd_k1_1', name: 'Budi Santoso', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta', kitchenId: 'k1', email: 'driver.jakarta@mbg.com', password: 'password' },
-      { id: 'd_k2_1', name: 'Ahmad Hidayat', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang', kitchenId: 'k2', email: 'driver.tangerang@mbg.com', password: 'password' },
-      { id: 'd_k3_1', name: 'Cecep Rahman', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung', kitchenId: 'k3', email: 'driver.bandung@mbg.com', password: 'password' }
+      // Jakarta Drivers (k1)
+      { id: 'd_k1_1', name: 'Budi Santoso', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta1', kitchenId: 'k1', email: 'driver.jakarta@mbg.com', password: 'password' },
+      { id: 'd_k1_2', name: 'Joko Widodo', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta2', kitchenId: 'k1', email: 'driver.jakarta2@mbg.com', password: 'password' },
+      { id: 'd_k1_3', name: 'Prabowo Subianto', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta3', kitchenId: 'k1', email: 'driver.jakarta3@mbg.com', password: 'password' },
+      { id: 'd_k1_4', name: 'Ganjar Pranowo', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta4', kitchenId: 'k1', email: 'driver.jakarta4@mbg.com', password: 'password' },
+      { id: 'd_k1_5', name: 'Anies Baswedan', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_jakarta5', kitchenId: 'k1', email: 'driver.jakarta5@mbg.com', password: 'password' },
+
+      // Tangerang Drivers (k2)
+      { id: 'd_k2_1', name: 'Ahmad Hidayat', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang1', kitchenId: 'k2', email: 'driver.tangerang@mbg.com', password: 'password' },
+      { id: 'd_k2_2', name: 'Rudi Hermawan', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang2', kitchenId: 'k2', email: 'driver.tangerang2@mbg.com', password: 'password' },
+      { id: 'd_k2_3', name: 'Deni Wijaya', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang3', kitchenId: 'k2', email: 'driver.tangerang3@mbg.com', password: 'password' },
+      { id: 'd_k2_4', name: 'Yusuf Mansur', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang4', kitchenId: 'k2', email: 'driver.tangerang4@mbg.com', password: 'password' },
+      { id: 'd_k2_5', name: 'Ali Imron', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_tangerang5', kitchenId: 'k2', email: 'driver.tangerang5@mbg.com', password: 'password' },
+
+      // Bandung Drivers (k3)
+      { id: 'd_k3_1', name: 'Cecep Rahman', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung1', kitchenId: 'k3', email: 'driver.bandung@mbg.com', password: 'password' },
+      { id: 'd_k3_2', name: 'Dadang Subur', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung2', kitchenId: 'k3', email: 'driver.bandung2@mbg.com', password: 'password' },
+      { id: 'd_k3_3', name: 'Eka Ramdani', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung3', kitchenId: 'k3', email: 'driver.bandung3@mbg.com', password: 'password' },
+      { id: 'd_k3_4', name: 'Firman Utina', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung4', kitchenId: 'k3', email: 'driver.bandung4@mbg.com', password: 'password' },
+      { id: 'd_k3_5', name: 'Gani Nurcahyo', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_bandung5', kitchenId: 'k3', email: 'driver.bandung5@mbg.com', password: 'password' },
+
+      // Depok Drivers (k4)
+      { id: 'd_k4_1', name: 'Hendra Saputra', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok1', kitchenId: 'k4', email: 'driver.depok@mbg.com', password: 'password' },
+      { id: 'd_k4_2', name: 'Indra Herlambang', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok2', kitchenId: 'k4', email: 'driver.depok2@mbg.com', password: 'password' },
+      { id: 'd_k4_3', name: 'Jaya Suprana', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok3', kitchenId: 'k4', email: 'driver.depok3@mbg.com', password: 'password' },
+      { id: 'd_k4_4', name: 'Kemal Pahlevi', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok4', kitchenId: 'k4', email: 'driver.depok4@mbg.com', password: 'password' },
+      { id: 'd_k4_5', name: 'Lukman Sardi', role: 'Driver', status: 'Active', avatar: 'https://i.pravatar.cc/150?u=driver_depok5', kitchenId: 'k4', email: 'driver.depok5@mbg.com', password: 'password' }
     ];
     for (const user of drivers) {
       const hashedPassword = await bcrypt.hash(user.password, 10);

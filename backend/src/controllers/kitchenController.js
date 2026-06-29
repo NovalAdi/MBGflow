@@ -14,8 +14,18 @@ const delay = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
 async function getKitchens(req, res) {
   await delay(50);
   try {
-    const [rows] = await db.query('SELECT * FROM kitchens');
-    res.json(rows);
+    const [kitchens] = await db.query('SELECT * FROM kitchens');
+    const [users] = await db.query('SELECT id, name, role, status, avatar, email, kitchenId FROM users WHERE kitchenId IS NOT NULL');
+
+    const kitchensWithStaff = kitchens.map(kitchen => {
+      const staff = users.filter(user => user.kitchenId === kitchen.id);
+      return {
+        ...kitchen,
+        staff
+      };
+    });
+
+    res.json(kitchensWithStaff);
   } catch (error) {
     console.error('Kitchens list error:', error);
     res.status(500).json({ error: 'Server error fetching kitchens list.' });
